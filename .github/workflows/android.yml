@@ -1,0 +1,131 @@
+name: WorshipFlow Android 5.8.3
+
+on:
+  push:
+    branches:
+      - "upgrade/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debug:
+    name: Debug APKs (API 23 and 29)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
+      - name: Install dependencies
+        run: npm ci
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+      - name: Build Debug variants
+        run: |
+          set -euo pipefail
+          chmod +x android/gradlew
+          cd android
+          ./gradlew --no-daemon assembleApi23Debug assembleApi29Debug
+      - name: Upload Debug APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: WorshipFlow-5.8.3-debug-api23-api29
+          path: |
+            android/app/build/outputs/apk/api23/debug/*.apk
+            android/app/build/outputs/apk/api29/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Signed Release APKs (API 23 and 29)
+    if: github.event_name != 'pull_request'
+    needs: debug
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
+      - name: Install dependencies
+        run: npm ci
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+      - name: Validate signing secrets and prepare keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Missing secret KEYSTORE_BASE64"; exit 1; }
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "::error::Missing secret KEYSTORE_PASSWORD"; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo "::error::Missing secret KEY_ALIAS"; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo "::error::Missing secret KEY_PASSWORD"; exit 1; }
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-release.jks"
+          test -s "$RUNNER_TEMP/android-release.jks"
+      - name: Build signed Release variants
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/android-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          chmod +x android/gradlew
+          RELEASE_CODE=$((1000 + GITHUB_RUN_NUMBER))
+          cd android
+          ./gradlew --no-daemon -PreleaseCode="$RELEASE_CODE" assembleApi23Release assembleApi29Release
+      - name: Verify Release signatures
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER" || { echo "::error::apksigner was not found"; exit 1; }
+          "$APKSIGNER" verify --verbose android/app/build/outputs/apk/api23/release/*.apk
+          "$APKSIGNER" verify --verbose android/app/build/outputs/apk/api29/release/*.apk
+      - name: Upload API 23 Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WorshipFlow-5.8.3-release-api23
+          path: android/app/build/outputs/apk/api23/release/*.apk
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload API 29 Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WorshipFlow-5.8.3-release-api29
+          path: android/app/build/outputs/apk/api29/release/*.apk
+          if-no-files-found: error
+          retention-days: 90
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/android-release.jks"

@@ -1,0 +1,94 @@
+name: WorshipFlow Android
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: Build type
+        type: choice
+        options: [debug, release]
+        default: debug
+      version_code:
+        description: 'Release code: 0 = auto (1000 + workflow run number), or explicit code > previous release'
+        default: '0'
+        required: true
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        api: [23, 29]
+    env:
+      BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
+      RELEASE_CODE: ${{ github.event.inputs.version_code || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npx cap sync android
+      - name: Version code
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_CODE" =~ ^[0-9]+$ ]]
+          if [ "$BUILD_TYPE" = release ]; then
+            if [ "$RELEASE_CODE" -eq 0 ]; then RELEASE_CODE=$((1000 + GITHUB_RUN_NUMBER)); fi
+            test "$RELEASE_CODE" -ge 30
+          else
+            RELEASE_CODE=30
+          fi
+          echo "RELEASE_CODE=$RELEASE_CODE" >> "$GITHUB_ENV"
+      - name: Prepare release signing
+        if: env.BUILD_TYPE == 'release'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_CODE" =~ ^[0-9]+$ ]] && [ "$RELEASE_CODE" -ge 30 ]
+          test -n "$KEYSTORE" && test -n "$STORE_PASS" && test -n "$KEY_ALIAS" && test -n "$KEY_PASS"
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/android-release.jks"
+      - name: Build
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          chmod +x android/gradlew
+          if [ "$BUILD_TYPE" = release ]; then
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/android-release.jks"
+            TASK="assembleApi${{ matrix.api }}Release"
+          else
+            TASK="assembleApi${{ matrix.api }}Debug"
+          fi
+          cd android
+          ./gradlew "$TASK" -PreleaseCode="$RELEASE_CODE" --no-daemon
+      - name: Verify signature
+        if: env.BUILD_TYPE == 'release'
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
+          set -euo pipefail
+          while IFS= read -r apk; do
+            "$APKSIGNER" verify --verbose "$apk"
+          done < <(find android/app/build/outputs/apk -name '*.apk')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WorshipFlow-5.8.3-api${{ matrix.api }}-${{ env.BUILD_TYPE }}
+          path: android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/android-release.jks"
