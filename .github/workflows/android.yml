@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "upgrade/**"
+      - "android-release-api23-api29"
   pull_request:
     branches:
       - main
