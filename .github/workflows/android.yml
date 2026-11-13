@@ -3,7 +3,7 @@ name: WorshipFlow Android 5.8.3
 on:
   push:
     branches:
-      - "upgrade/**"
+      - main
   pull_request:
     branches:
       - main

@@ -182,7 +182,7 @@ public class NativeAudioPlugin extends Plugin {
                         DocumentsContract.Document.MIME_TYPE_DIR, safeFileName(folderName));
                 if (folder == null) throw new IllegalStateException("Impossible de créer le dossier d’export.");
                 for (int i = 0; i < files.length(); i++) {
-                    JSObject item = files.getJSONObject(i);
+                    org.json.JSONObject item = files.getJSONObject(i);
                     if (item == null) continue;
                     String sourceRaw = item.getString("uri");
                     String name = safeFileName(item.optString("name", "audio-" + (i + 1) + ".mp3"));
