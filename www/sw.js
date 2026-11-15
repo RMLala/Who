@@ -1,9 +1,10 @@
-/* WorshipFlow : cache hors ligne de l'application (les données restent dans IndexedDB) */
-const C='worshipflow-v5-8-3';
+/* Cache only the public application shell. Never cache or replace Cloud/API responses. */
+const C='worshipflow-v5-8-3-appforge-1';
 const A=['./','./index.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(A)).then(()=>self.skipWaiting()))});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
+self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(A)).then(()=>self.skipWaiting())));
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('worshipflow-')&&k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{
-  if(e.request.method!=='GET')return;
-  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(n=>{const cp=n.clone();caches.open(C).then(c=>c.put(e.request,cp));return n}).catch(()=>caches.match('./index.html'))));
+ const url=new URL(e.request.url),allowed=A.some(path=>new URL(path,self.location.href).pathname===url.pathname);
+ if(e.request.method!=='GET'||url.origin!==self.location.origin||!allowed||e.request.headers.has('Authorization'))return;
+ e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request).then(response=>{if(response.ok){const copy=response.clone();e.waitUntil(caches.open(C).then(cache=>cache.put(e.request,copy)))}return response})));
 });

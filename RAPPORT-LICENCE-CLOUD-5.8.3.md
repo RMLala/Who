@@ -19,8 +19,10 @@
 - /health AppForge Cloud : service en ligne, D1 et authentification email/mot de passe annoncés.
 - Préflight Cloud depuis https://localhost : HTTP 204, origine Android autorisée.
 - Demande d’essai réelle pour WORSHIPFLOW : « Application inconnue ou inactive. »
-- 12 tests Node réussis localement : scripts HTML, format des données, ECDSA valide/invalide, expiration, installation, révocation, réseau, conflits, révisions et exclusion des secrets/chemins audio.
+- 13 tests Node réussis localement : scripts HTML, format des données, ECDSA valide/invalide, expiration, installation, révocation, réseau, conflits, révisions et exclusion des secrets/chemins audio.
 - Les tests UI mobile/ordinateur et les quatre builds sont lancés par GitHub Actions sur la PR. Les Release sur PR sont limitées aux branches appartenant au même dépôt ; les forks n’accèdent pas aux secrets.
+
+- Correction du cache existant : seuls les fichiers publics de l’application sont mis en cache ; les API Cloud et requêtes authentifiées ne sont jamais interceptées ni remplacées par du HTML hors ligne.
 
 ## Limites et blocage de mise en production
 
