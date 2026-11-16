@@ -1,0 +1,37 @@
+name: AppForge V3 compliance scan
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run non-blocking V3 inventory
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib,re,os
+          root=pathlib.Path('.')
+          files=[p for p in root.rglob('*') if p.is_file() and '.git' not in p.parts and 'node_modules' not in p.parts and 'build' not in p.parts and p.suffix.lower() in ('.js','.ts','.tsx','.jsx','.html','.java','.kt','.json') and p.stat().st_size<1500000]
+          flags=[]
+          patterns={
+            'Drive OAuth integration to review':r'(?:drive\.googleapis\.com|googleapis\.com/auth/drive|GoogleSignIn)',
+            'PWA references to review':r'(?:serviceWorker\.register|manifest\.webmanifest)',
+            'Possible hardcoded credential to review':r'(?:ghp_[A-Za-z0-9]{20,}|AIza[A-Za-z0-9_-]{25,})'
+          }
+          for p in files:
+            data=p.read_text(encoding='utf-8',errors='replace')
+            for label,pattern in patterns.items():
+              if re.search(pattern,data,re.I): flags.append((label,str(p)))
+          lines=['# AppForge V3 — preliminary audit', '',f'Files inspected: {len(files)}','', '## Findings (manual confirmation required)']
+          lines += [f'- {label}: `{path}`' for label,path in flags[:80]] or ['- No matching patterns detected (does not establish compliance)']
+          lines += ['','## Not automatically verified','- PIN, biometrics, native Drive share, backup encryption','- License/cloud operation, synchronization and conflict resolution','- Logo resolution, accessibility, UI, real APK artifacts','- User acceptance and functional tests','','Reference: https://github.com/RMLala/android-template/blob/main/APPFORGE-STANDARD-V3.md']
+          summary='\n'.join(lines)+'\n'
+          pathlib.Path(os.environ['GITHUB_STEP_SUMMARY']).write_text(summary,encoding='utf-8')
+          print(summary)
+          PY
