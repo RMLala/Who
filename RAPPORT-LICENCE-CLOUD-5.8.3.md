@@ -14,8 +14,8 @@
 - Le plugin Android `NativeSecurityPlugin` utilise Android Keystore, AndroidX BiometricPrompt et AES-GCM. La clé de données reste en mémoire uniquement pendant la session native.
 - À la première ouverture, l’utilisateur crée un PIN de 6 à 12 chiffres. La dérivation PBKDF2-HMAC-SHA256 (210 000 itérations) protège une copie de récupération de la clé de données. Si une biométrie forte est disponible, Android demande une confirmation biométrique et conserve une enveloppe séparée liée au Keystore.
 - Aux ouvertures suivantes, la biométrie est proposée en premier; le PIN déverrouille la clé quand la biométrie est annulée ou indisponible.
-- Les enregistrements IndexedDB des chants, cultes, inspirations, préférences, thèmes, licences et réglages Cloud sont chiffrés AES-256-GCM au repos. Les anciennes lignes en clair sont converties de façon idempotente après déverrouillage; un arrêt pendant la migration ne supprime pas les données restantes.
-- Les blobs audio du magasin séparé `audio` et les fichiers audio choisis par URI ne sont pas chiffrés par ce coffre; les chemins et métadonnées de fichiers stockés dans les enregistrements de chants sont chiffrés.
+- Tous les magasins IndexedDB (`songs`, `services`, `insps`, `kv` et `audio`) sont chiffrés AES-256-GCM au repos, y compris les blobs audio importés (chiffrés par blocs de 512 Kio). Les fichiers audio choisis par URI restent dans leur emplacement d’origine hors IndexedDB; chemins et métadonnées stockés dans les chants sont chiffrés.
+- Les anciennes lignes et blobs en clair sont convertis de façon idempotente après déverrouillage; un arrêt pendant la migration ne supprime pas les données restantes.
 - Le PIN ne peut pas être réinitialisé sans perte d’accès à la clé de données. Conserver une sauvegarde exportée séparément. Les sauvegardes Drive et leur chiffrement facultatif sont des fonctions distinctes.
 - Le pont Android est requis pour utiliser ce parcours sécurisé. Le test UI navigateur fournit un faux pont de test et ne démontre pas une biométrie réelle.
 
