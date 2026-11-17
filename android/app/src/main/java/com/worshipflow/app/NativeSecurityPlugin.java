@@ -139,17 +139,18 @@ public class NativeSecurityPlugin extends Plugin {
         out.put("unlocked", dataKey != null);
         out.put("biometricAvailable", biometricAvailable());
         out.put("biometricEnabled", prefs().contains("bioWrapped"));
+        out.put("pinLength", prefs().getInt("pinLength", 0));
         call.resolve(out);
     }
     @PluginMethod public void configurePin(PluginCall call) {
         String pin = call.getString("pin", "");
-        if (pin == null || !pin.matches("[0-9]{6,12}")) { call.reject("Le PIN doit contenir 6 à 12 chiffres."); return; }
+        if (pin == null || !pin.matches("[0-9]{4}")) { call.reject("Le PIN doit contenir 6 à 12 chiffres."); return; }
         try {
             byte[] keyBytes = random(32), salt = random(16), iv = new byte[12];
             SecretKey wrapping = derivePinKey(pin, salt);
             byte[] wrapped = aesEncrypt(wrapping, keyBytes, iv);
             prefs().edit().putString("pinSalt", b64(salt)).putString("pinIv", b64(iv))
-                    .putString("pinWrapped", b64(wrapped)).remove("bioIv").remove("bioWrapped").commit();
+                    .putString("pinWrapped", b64(wrapped)).putInt("pinLength", 4).remove("bioIv").remove("bioWrapped").commit();
             dataKey = keyBytes;
             if (biometricAvailable()) saveBiometricWrap(call, keyBytes);
             else { JSObject out = new JSObject(); out.put("configured", true); out.put("biometricEnabled", false); call.resolve(out); }
@@ -164,6 +165,20 @@ public class NativeSecurityPlugin extends Plugin {
             dataKey = key;
             JSObject out = new JSObject(); out.put("unlocked", true); call.resolve(out);
         } catch (Exception e) { call.reject("PIN incorrect ou données de sécurité endommagées."); }
+    }
+    @PluginMethod public void changePin(PluginCall call) {
+        try {
+            requireUnlocked(call);
+            String pin = call.getString("pin", "");
+            if (pin == null || !pin.matches("[0-9]{4}")) { call.reject("Le PIN doit contenir exactement 4 chiffres."); return; }
+            byte[] salt = random(16), iv = new byte[12];
+            SecretKey wrapping = derivePinKey(pin, salt);
+            byte[] wrapped = aesEncrypt(wrapping, dataKey, iv);
+            boolean saved = prefs().edit().putString("pinSalt", b64(salt)).putString("pinIv", b64(iv))
+                    .putString("pinWrapped", b64(wrapped)).putInt("pinLength", 4).commit();
+            if (!saved) throw new IllegalStateException("Écriture du PIN impossible.");
+            JSObject out = new JSObject(); out.put("changed", true); out.put("pinLength", 4); call.resolve(out);
+        } catch (Exception e) { call.reject("Modification du PIN impossible : " + e.getMessage(), e); }
     }
     @PluginMethod public void unlockWithBiometrics(PluginCall call) {
         if (!prefs().contains("bioWrapped")) { call.reject("Biométrie non configurée. Utilisez le PIN."); return; }
