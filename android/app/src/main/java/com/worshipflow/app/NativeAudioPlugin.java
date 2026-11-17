@@ -6,6 +6,9 @@ import android.database.Cursor;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.media.AudioFocusRequest;
+import android.content.Context;
 import android.os.HandlerThread;
 import android.os.PowerManager;
 import android.net.Uri;
@@ -48,6 +51,11 @@ public class NativeAudioPlugin extends Plugin {
     private final HandlerThread audioThread = new HandlerThread("WorshipFlowAudio");
     private Handler audioHandler;
     private MediaPlayer player;
+    private AudioManager audioManager;
+    private AudioFocusRequest audioFocusRequest;
+    private final AudioManager.OnAudioFocusChangeListener audioFocusChangeListener = this::onAudioFocusChange;
+    private boolean resumeAfterFocusGain = false;
+    private boolean duckedForFocus = false;
     private boolean prepared = false;
     private PluginCall pendingPlay;
     private final Map<String, OutputStream> exportStreams = new ConcurrentHashMap<>();
@@ -55,6 +63,80 @@ public class NativeAudioPlugin extends Plugin {
     @Override public void load() {
         audioThread.start();
         audioHandler = new Handler(audioThread.getLooper());
+    }
+
+    private boolean requestAudioFocus() {
+        if (audioManager == null) {
+            audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        }
+        if (audioManager == null) return false;
+        int result;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioFocusRequest request = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                    .setOnAudioFocusChangeListener(audioFocusChangeListener, audioHandler)
+                    .setAcceptsDelayedFocusGain(false)
+                    .setWillPauseWhenDucked(false)
+                    .build();
+            audioFocusRequest = request;
+            result = audioManager.requestAudioFocus(request);
+        } else {
+            result = audioManager.requestAudioFocus(
+                    audioFocusChangeListener,
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN);
+        }
+        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+    }
+
+    private void abandonAudioFocus() {
+        if (audioManager == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
+            audioManager.abandonAudioFocusRequest(audioFocusRequest);
+            audioFocusRequest = null;
+        } else {
+            audioManager.abandonAudioFocus(audioFocusChangeListener);
+        }
+        resumeAfterFocusGain = false;
+        duckedForFocus = false;
+    }
+
+    private void onAudioFocusChange(int focusChange) {
+        if (audioHandler == null) return;
+        audioHandler.post(() -> {
+            if (player == null || !prepared) return;
+            if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+                if (duckedForFocus) {
+                    try { player.setVolume(1f, 1f); } catch (Exception ignored) {}
+                    duckedForFocus = false;
+                }
+                if (resumeAfterFocusGain) {
+                    resumeAfterFocusGain = false;
+                    try {
+                        player.start();
+                        keepScreen(true);
+                        startProgress();
+                    } catch (Exception e) {
+                        failPlayback("Reprise audio impossible : " + e.getMessage());
+                    }
+                }
+                return;
+            }
+            if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+                try { player.setVolume(0.2f, 0.2f); duckedForFocus = true; } catch (Exception ignored) {}
+                return;
+            }
+            boolean transientLoss = focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT;
+            if (focusChange == AudioManager.AUDIOFOCUS_LOSS || transientLoss) {
+                resumeAfterFocusGain = transientLoss && player.isPlaying();
+                if (player.isPlaying()) player.pause();
+                stopProgress();
+                keepScreen(false);
+                if (!transientLoss) abandonAudioFocus();
+            }
+        });
     }
 
     private void keepScreen(boolean enabled) {
@@ -455,6 +537,8 @@ public class NativeAudioPlugin extends Plugin {
                         prepared = true;
                         Integer seek = call.getInt("startAt", 0);
                         if (seek != null && seek > 0) mp.seekTo(seek * 1000);
+                        if (!requestAudioFocus()) { failPlayback("Le focus audio n’est pas disponible."); return; }
+                        resumeAfterFocusGain = false;
                         mp.start();
                         keepScreen(true);
                         startProgress();
@@ -466,6 +550,7 @@ public class NativeAudioPlugin extends Plugin {
                     if (mp != player) return;
                     stopProgress();
                     keepScreen(false);
+                    abandonAudioFocus();
                     JSObject event = new JSObject(); event.put("uri", raw);
                     notifyListeners("ended", event);
                 });
@@ -497,10 +582,14 @@ public class NativeAudioPlugin extends Plugin {
         });
     }
     @PluginMethod public void pause(PluginCall call) {
-        command(call, () -> { if (player.isPlaying()) player.pause(); stopProgress(); keepScreen(false); });
+        command(call, () -> { resumeAfterFocusGain = false; if (player.isPlaying()) player.pause(); stopProgress(); keepScreen(false); abandonAudioFocus(); });
     }
     @PluginMethod public void resume(PluginCall call) {
-        command(call, () -> { player.start(); keepScreen(true); startProgress(); });
+        command(call, () -> {
+            if (!requestAudioFocus()) throw new IllegalStateException("Le focus audio n’est pas disponible.");
+            resumeAfterFocusGain = false;
+            player.start(); keepScreen(true); startProgress();
+        });
     }
     @PluginMethod public void seekTo(PluginCall call) {
         command(call, () -> {
@@ -576,6 +665,7 @@ public class NativeAudioPlugin extends Plugin {
     }
     private void releasePlayer() {
         stopProgress();
+        abandonAudioFocus();
         prepared = false;
         keepScreen(false);
         if (pendingPlay != null) { pendingPlay.reject("Lecture remplacée ou arrêtée."); pendingPlay = null; }
