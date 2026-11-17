@@ -12,6 +12,6 @@
 
 ## Vérifications
 
-La tête de branche et les derniers builds sont en cours de vérification par GitHub Actions : tests Node, UI navigateur, Debug API 23/29, Release API 23/29 et signatures. Ces tests automatisés ne remplacent pas la validation biométrique sur téléphone, la connexion AppForge réelle ni un test de synchronisation avec un compte Cloud autorisé.
+Le workflow [44108769659](https://github.com/RMLala/Who/actions/runs/44108769659) a réussi sur le code applicatif `c709011`: 16 tests Node, UI mobile/ordinateur, Debug API 23/29, Release API 23/29 et signatures vérifiées. Artefacts: Debug `14339458016`, Release API 23 `14339861942`, Release API 29 `14341025095`. Les tests automatisés ne remplacent pas la validation biométrique sur téléphone, la connexion AppForge réelle ni une synchronisation avec un compte Cloud autorisé.
 
 L’activation administrative de WORSHIPFLOW n’est pas incluse dans ce commit : aucun accès à la console AppForge Studio n’est connecté ici.
