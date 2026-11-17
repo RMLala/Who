@@ -582,7 +582,7 @@ public class NativeAudioPlugin extends Plugin {
         });
     }
     @PluginMethod public void pause(PluginCall call) {
-        command(call, () -> { resumeAfterFocusGain = false; if (player.isPlaying()) player.pause(); stopProgress(); keepScreen(false); });
+        command(call, () -> { resumeAfterFocusGain = false; if (player.isPlaying()) player.pause(); stopProgress(); keepScreen(false); abandonAudioFocus(); });
     }
     @PluginMethod public void resume(PluginCall call) {
         command(call, () -> {
