@@ -1,4 +1,4 @@
-name: WorshipFlow Android 5.8.3
+name: WorshipFlow Android 5.8.4
 
 on:
   push:
@@ -52,7 +52,7 @@ jobs:
       - name: Upload Debug APKs
         uses: actions/upload-artifact@v4
         with:
-          name: WorshipFlow-5.8.3-debug-api23-api29
+          name: WorshipFlow-5.8.4-debug-api23-api29
           path: |
             android/app/build/outputs/apk/api23/debug/*.apk
             android/app/build/outputs/apk/api29/debug/*.apk
@@ -123,14 +123,14 @@ jobs:
       - name: Upload API 23 Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: WorshipFlow-5.8.3-release-api23
+          name: WorshipFlow-5.8.4-release-api23
           path: android/app/build/outputs/apk/api23/release/*.apk
           if-no-files-found: error
           retention-days: 90
       - name: Upload API 29 Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: WorshipFlow-5.8.3-release-api29
+          name: WorshipFlow-5.8.4-release-api29
           path: android/app/build/outputs/apk/api29/release/*.apk
           if-no-files-found: error
           retention-days: 90
