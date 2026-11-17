@@ -798,20 +798,20 @@ async function afInit(){try{AF.installation=await get('kv','appforge-installatio
 window.addEventListener('online',()=>{if(AF.license.token)afLicense('status');if(AF.cloud.enabled)afSync()});
 
 
-function securityPinDialog(title,confirmPin){
+function securityPinDialog(title,{confirmPin=false,legacy=false}={}){
   return new Promise(resolve=>{
     const layer=document.createElement('div');layer.setAttribute('role','dialog');layer.setAttribute('aria-modal','true');
     layer.style.cssText='position:fixed;inset:0;z-index:100000;background:#07111feF;display:grid;place-items:center;padding:20px;font:16px Inter,Arial,sans-serif';
     const card=document.createElement('form');card.style.cssText='width:min(100%,390px);background:#fff;color:#142238;border-radius:20px;padding:24px;box-shadow:0 20px 70px #0008';
     const heading=document.createElement('h2');heading.textContent=title;heading.style.cssText='margin:0 0 8px;font-size:21px';
-    const help=document.createElement('p');help.textContent='Entrez un PIN de 6 à 12 chiffres. Il protège le stockage local et sert de secours à la biométrie.';help.style.cssText='color:#59677a;line-height:1.45;margin:0 0 16px';
-    const input=document.createElement('input');input.type='password';input.inputMode='numeric';input.autocomplete='off';input.pattern='[0-9]{6,12}';input.minLength=6;input.maxLength=12;input.required=true;input.placeholder='PIN (6 à 12 chiffres)';input.style.cssText='box-sizing:border-box;width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:10px;font-size:18px;letter-spacing:.2em';
+    const help=document.createElement('p');help.textContent=legacy?'Entrez votre ancien PIN (4 à 12 chiffres) pour déverrouiller, puis choisissez un nouveau PIN à 4 chiffres.':'Entrez exactement 4 chiffres. Ce PIN sert de secours à la biométrie.';help.style.cssText='color:#59677a;line-height:1.45;margin:0 0 16px';
+    const input=document.createElement('input');input.type='password';input.inputMode='numeric';input.autocomplete='off';input.pattern=legacy?'[0-9]{4,12}':'[0-9]{4}';input.minLength=4;input.maxLength=legacy?12:4;input.required=true;input.placeholder=legacy?'Ancien PIN':'PIN à 4 chiffres';input.style.cssText='box-sizing:border-box;width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:10px;font-size:18px;letter-spacing:.3em';
     const error=document.createElement('div');error.setAttribute('aria-live','polite');error.style.cssText='color:#b42318;min-height:22px;margin-top:8px;font-size:13px';
     const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;margin-top:12px';
-    const submit=document.createElement('button');submit.type='submit';submit.textContent=confirmPin?'Continuer':'Déverrouiller';submit.style.cssText='flex:1;border:0;border-radius:10px;padding:13px;background:#146c5a;color:white;font-weight:700';
+    const submit=document.createElement('button');submit.type='submit';submit.textContent=confirmPin?'Confirmer':'Continuer';submit.style.cssText='flex:1;border:0;border-radius:10px;padding:13px;background:#146c5a;color:white;font-weight:700';
     const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Annuler';cancel.style.cssText='border:1px solid #cbd5e1;border-radius:10px;padding:13px;background:#fff;color:#263445';
     actions.append(submit,cancel);card.append(heading,help,input,error,actions);layer.append(card);document.body.append(layer);
-    cancel.onclick=()=>{layer.remove();resolve(null)};card.onsubmit=e=>{e.preventDefault();const pin=input.value;if(!/^[0-9]{6,12}$/.test(pin)){error.textContent='Le PIN doit contenir 6 à 12 chiffres.';return}layer.remove();resolve(pin)};
+    cancel.onclick=()=>{layer.remove();resolve(null)};card.onsubmit=e=>{e.preventDefault();const pin=input.value,valid=legacy?/^[0-9]{4,12}$/.test(pin):/^[0-9]{4}$/.test(pin);if(!valid){error.textContent=legacy?'Entrez de 4 à 12 chiffres.':'Le PIN doit contenir exactement 4 chiffres.';return}layer.remove();resolve(pin)};
     input.focus();
   });
 }
@@ -819,18 +819,34 @@ async function securityUnlock(){
   if(!NativeSecurityAPI)throw new Error('Le verrouillage sécurisé nécessite l’application Android WorshipFlow.');
   const status=await NativeSecurityAPI.status();
   if(!status.configured){
-    const first=await securityPinDialog('Sécuriser WorshipFlow',true);if(!first)throw new Error('Configuration de sécurité annulée.');
-    const second=await securityPinDialog('Confirmer le PIN',true);if(!second)throw new Error('Configuration de sécurité annulée.');
-    if(first!==second)throw new Error('Les deux PIN ne correspondent pas. Fermez et relancez WorshipFlow pour recommencer.');
+    let first=null,second=null;
+    while(first===null||second===null||first!==second){
+      first=await securityPinDialog('Créer votre PIN',{});
+      if(!first)throw new Error('Configuration de sécurité annulée.');
+      second=await securityPinDialog('Confirmer le PIN',{confirmPin:true});
+      if(!second)throw new Error('Configuration de sécurité annulée.');
+      if(first!==second){alert('Les deux PIN ne correspondent pas. Recommencez.');first=null;second=null}
+    }
     const configured=await NativeSecurityAPI.configurePin({pin:first});
     if(configured.message)console.info(configured.message);
   }else{
     let unlocked=false;
     if(status.biometricEnabled&&status.biometricAvailable){try{await NativeSecurityAPI.unlockWithBiometrics();unlocked=true}catch(e){console.info('Biométrie indisponible; PIN de secours proposé.')}}
     while(!unlocked){
-      const pin=await securityPinDialog(status.biometricEnabled?'PIN de secours':'Déverrouiller WorshipFlow',false);
+      const pin=await securityPinDialog(status.biometricEnabled?'PIN de secours':'Déverrouiller WorshipFlow',{legacy:status.pinLength!==4});
       if(!pin)throw new Error('Déverrouillage annulé.');
       try{await NativeSecurityAPI.unlockWithPin({pin});unlocked=true}catch(e){alert('PIN incorrect. Réessayez.')}
+    }
+    if(status.pinLength!==4){
+      let first=null,second=null;
+      while(first===null||second===null||first!==second){
+        first=await securityPinDialog('Définir le nouveau PIN à 4 chiffres',{});
+        if(!first)throw new Error('Le PIN à 4 chiffres est requis. Fermez et relancez WorshipFlow pour reprendre.');
+        second=await securityPinDialog('Confirmer le nouveau PIN',{confirmPin:true});
+        if(!second)throw new Error('Le PIN à 4 chiffres est requis. Fermez et relancez WorshipFlow pour reprendre.');
+        if(first!==second){alert('Les deux PIN ne correspondent pas. Recommencez.');first=null;second=null}
+      }
+      await NativeSecurityAPI.changePin({pin:first});
     }
   }
   secureStorageEnabled=true;
