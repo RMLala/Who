@@ -1,35 +1,28 @@
-# WorshipFlow 5.8.3 — licence et synchronisation
+# WorshipFlow 5.8.3 — licences, synchronisation et sécurité locale
 
-## Implémentation
+## Licence et synchronisation
 
-- Contrat réel AppForge License API : trial, activate, status. Produit : WORSHIPFLOW.
-- Preuves ECDSA P-256 vérifiées avec la clé publique du service, application et installation contrôlées, expiration vérifiée. Aucun secret administrateur embarqué.
-- Essai demandé au serveur, sans création d’un nouvel identifiant lors des sauvegardes/restaurations ordinaires. Les réinstallations/effacements de stockage peuvent créer une nouvelle installation : une protection contre ces contournements exige une identité serveur ou une attestation native.
-- Licence bloquée après réponse autoritative d’invalidité/révocation. Une erreur réseau conserve la dernière preuve valide jusqu’à son expiration. Pas de renouvellement local de l’essai.
-- Connexion Cloud avec compte existant, choix d’organisation, session en mémoire uniquement, déconnexion et révocation serveur de session.
-- Instantanés versionnés : chants, cultes, ressources, thèmes. Audio, chemins d’accès, réglages de l’appareil, jetons et mots de passe exclus.
-- Synchronisation manuelle et automatique toutes les 30 secondes lorsque la session et l’option sont actives, reprise au retour du réseau.
-- Première divergence ou modifications simultanées : arrêt et choix explicite. Révision attendue dans chaque PUT ; réponse 409 conservée comme conflit.
-- Application atomique des données cloud dans IndexedDB, conservation des accès audio propres à cet appareil, copie de récupération avant remplacement.
-- Formats FR/MG/EN pour le panneau principal ; certains messages techniques restent en français.
+- Produit AppForge : WORSHIPFLOW. Contrat : essai, activation et statut; preuves ECDSA P-256 vérifiées côté client contre la clé publique de service.
+- La synchronisation reste désactivée sans licence payante active et session Cloud valide. Les changements locaux activent la possibilité de synchroniser; l’achat ne crée pas un compte ni une organisation.
+- Connexion Cloud avec un compte existant, sélection d’organisation, session en mémoire, déconnexion et révocation.
+- Synchronisation versionnée toutes les 30 secondes, reprise réseau, contrôle de révision, conflits 409 explicites et copie locale de récupération avant application.
+- Instantanés limités aux chants, cultes, ressources et thèmes. Audio, chemins de fichiers, réglages appareil, licence et identifiants ne sont pas synchronisés.
+- Les réponses autoritatives d’invalidité/révocation bloquent la licence. Une erreur réseau conserve la preuve valide jusqu’à expiration. Pas de renouvellement local d’essai.
 
-## Vérification observée le 15 novembre 2026
+## Sécurité locale ajoutée sur la PR #8
 
-- /v1/config du service de licences : réponse réelle et clé publique observées.
-- /health AppForge Cloud : service en ligne, D1 et authentification email/mot de passe annoncés.
-- Préflight Cloud depuis https://localhost : HTTP 204, origine Android autorisée.
-- Demande d’essai réelle pour WORSHIPFLOW : « Application inconnue ou inactive. »
-- 13 tests Node réussis localement : scripts HTML, format des données, ECDSA valide/invalide, expiration, installation, révocation, réseau, conflits, révisions et exclusion des secrets/chemins audio.
-- Les tests UI mobile/ordinateur et les quatre builds sont lancés par GitHub Actions sur la PR. Les Release sur PR sont limitées aux branches appartenant au même dépôt ; les forks n’accèdent pas aux secrets.
+- Le plugin Android `NativeSecurityPlugin` utilise Android Keystore, AndroidX BiometricPrompt et AES-GCM. La clé de données reste en mémoire uniquement pendant la session native.
+- À la première ouverture, l’utilisateur crée un PIN de 6 à 12 chiffres. La dérivation PBKDF2-HMAC-SHA256 (210 000 itérations) protège une copie de récupération de la clé de données. Si une biométrie forte est disponible, Android demande une confirmation biométrique et conserve une enveloppe séparée liée au Keystore.
+- Aux ouvertures suivantes, la biométrie est proposée en premier; le PIN déverrouille la clé quand la biométrie est annulée ou indisponible.
+- Les enregistrements IndexedDB des chants, cultes, inspirations, préférences, thèmes, licences et réglages Cloud sont chiffrés AES-256-GCM au repos. Les anciennes lignes en clair sont converties de façon idempotente après déverrouillage; un arrêt pendant la migration ne supprime pas les données restantes.
+- Les blobs audio du magasin séparé `audio` et les fichiers audio choisis par URI ne sont pas chiffrés par ce coffre; les chemins et métadonnées de fichiers stockés dans les enregistrements de chants sont chiffrés.
+- Le PIN ne peut pas être réinitialisé sans perte d’accès à la clé de données. Conserver une sauvegarde exportée séparément. Les sauvegardes Drive et leur chiffrement facultatif sont des fonctions distinctes.
+- Le pont Android est requis pour utiliser ce parcours sécurisé. Le test UI navigateur fournit un faux pont de test et ne démontre pas une biométrie réelle.
 
-- Correction du cache existant : seuls les fichiers publics de l’application sont mis en cache ; les API Cloud et requêtes authentifiées ne sont jamais interceptées ni remplacées par du HTML hors ligne.
+## Vérifications
 
-## Limites et blocage de mise en production
-
-Le produit WORSHIPFLOW doit être ajouté/activé dans AppForge Studio → Codes de déblocage → Applications, sur le Worker de licences existant. Cette opération exige la session administrateur du propriétaire ; elle n’est pas disponible dans cet environnement. Ne pas publier cette version avec le verrou de licence tant que le produit est inconnu.
-
-Aucune activation payante, licence propriétaire ou synchronisation avec un compte réel n’est déclarée vérifiée. Les tests simulés ne remplacent pas une validation avec le service et un compte autorisé. L’accès et la session Cloud sont requis pour les essais réels de synchronisation inter-appareils.
-
-La vérification JavaScript locale apporte un contrôle fonctionnel ; une version HTML modifiable peut être contournée. Le contrôle d’accès réel aux données Cloud est assuré par le backend. Le stockage audio n’est pas un service de transfert des fichiers MP3.
-
-Cette intégration est préparée dans la branche dédiée de reprise depuis le main actuel. Les APK de cette branche restent des candidats de test, pas une livraison de production validée. Garder la PR ouverte jusqu’à l’enregistrement et l’activation de WORSHIPFLOW, au test réel de l’essai, à une connexion Cloud autorisée et à la synchronisation avec un compte réel.
+- PR #8 rebasée sur `main` avant cette livraison; modifications poussées sur `work/worshipflow-v3-cloud-20261117`.
+- CI à contrôler après les derniers commits : tests Node, contrôle navigateur mobile/ordinateur, compilation Debug API 23/29, Releases signées API 23/29 et contrôle de signature.
+- Ces contrôles automatisés ne valident pas la biométrie sur appareil, l’accès audio, le partage Drive, une restauration réelle, l’achat/activation réelle, ni une synchronisation avec compte réel.
+- Lors de la vérification précédente, l’essai réel répondait « Application inconnue ou inactive ». La console AppForge Studio et ses permissions d’administration ne sont pas connectées à cet environnement. L’activation du produit et l’essai Cloud réel ne sont donc pas confirmés par ce changement.
+- Une activation réelle exige l’ajout/activation de WORSHIPFLOW dans AppForge Studio. Aucun secret administrateur n’est intégré au dépôt ni à l’application.
