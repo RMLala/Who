@@ -1,5 +1,5 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const {webcrypto}=require('node:crypto');
-const html=fs.readFileSync('www/index.html','utf8');const code=html.slice(html.indexOf('/* AppForge integration:'),html.lastIndexOf('load().then(afInit)'));
+const html=fs.readFileSync('www/index.html','utf8');const code=html.slice(html.indexOf('/* AppForge integration:'),html.lastIndexOf('function securityPinDialog'));
 function env(extra={}){const db=new Map(),ctx=vm.createContext({crypto:webcrypto,TextEncoder,TextDecoder,atob,btoa,Uint8Array,AbortController,setTimeout,clearTimeout,setInterval,window:{addEventListener(){}},navigator:{onLine:true},set:{lang:'fr'},toast(){},tab:'hira',document:{getElementById(){return null}},put:async(s,v,k)=>db.set(s+':'+k,v),get:async(s,k)=>db.get(s+':'+k),...extra});vm.runInContext(code,ctx);return {ctx,run:s=>vm.runInContext(s,ctx),db}}
 const sample={schema:1,app:'worshipflow',songs:[{id:1,title:'Titre',lyrics:'Texte',themes:[]}],services:[{id:2,ids:[1],date:'2026-11-15'}],insps:[],themes:[]};
 test('all actual inline scripts parse independently',()=>{for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))if(!/src=/.test(m[1]))new vm.Script(m[2]);});
