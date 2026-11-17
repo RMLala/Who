@@ -22,7 +22,8 @@
 ## Vérifications
 
 - PR #8 rebasée sur `main` avant cette livraison; modifications poussées sur `work/worshipflow-v3-cloud-20261117`.
-- CI à contrôler après les derniers commits : tests Node, contrôle navigateur mobile/ordinateur, compilation Debug API 23/29, Releases signées API 23/29 et contrôle de signature.
+- Sur la révision applicative `62d474c`, le workflow [44101807057](https://github.com/RMLala/Who/actions/runs/44101807057) a réussi : 13 tests Node, UI mobile/ordinateur, Debug API 23/29, Releases signées API 23/29 et vérification des signatures.
+- Artefacts de test de cette révision : Debug ZIP `14335024713`, Release API 23 ZIP `14335249725`, Release API 29 ZIP `14336937499`. Ce sont des candidats de PR, pas une version de production validée.
 - Ces contrôles automatisés ne valident pas la biométrie sur appareil, l’accès audio, le partage Drive, une restauration réelle, l’achat/activation réelle, ni une synchronisation avec compte réel.
 - Lors de la vérification précédente, l’essai réel répondait « Application inconnue ou inactive ». La console AppForge Studio et ses permissions d’administration ne sont pas connectées à cet environnement. L’activation du produit et l’essai Cloud réel ne sont donc pas confirmés par ce changement.
 - Une activation réelle exige l’ajout/activation de WORSHIPFLOW dans AppForge Studio. Aucun secret administrateur n’est intégré au dépôt ni à l’application.
