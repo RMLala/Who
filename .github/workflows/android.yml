@@ -35,6 +35,12 @@ jobs:
           packages: platform-tools platforms;android-34 build-tools;34.0.0
       - name: Install dependencies
         run: npm ci
+      - name: Run frontend and AppForge tests
+        run: npm test
+      - name: Install browser for UI checks
+        run: npx playwright install --with-deps chromium
+      - name: Check mobile and desktop UI
+        run: node tests/browser.cjs
       - name: Sync Capacitor Android project
         run: npx cap sync android
       - name: Build Debug variants
@@ -55,7 +61,7 @@ jobs:
 
   release:
     name: Signed Release APKs (API 23 and 29)
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: debug
     runs-on: ubuntu-latest
     steps:
@@ -77,6 +83,8 @@ jobs:
           packages: platform-tools platforms;android-34 build-tools;34.0.0
       - name: Install dependencies
         run: npm ci
+      - name: Run frontend and AppForge tests
+        run: npm test
       - name: Sync Capacitor Android project
         run: npx cap sync android
       - name: Validate signing secrets and prepare keystore
