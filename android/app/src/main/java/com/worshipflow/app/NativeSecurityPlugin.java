@@ -144,7 +144,7 @@ public class NativeSecurityPlugin extends Plugin {
     }
     @PluginMethod public void configurePin(PluginCall call) {
         String pin = call.getString("pin", "");
-        if (pin == null || !pin.matches("[0-9]{4}")) { call.reject("Le PIN doit contenir 6 à 12 chiffres."); return; }
+        if (pin == null || !pin.matches("[0-9]{4}")) { call.reject("Le PIN doit contenir exactement 4 chiffres."); return; }
         try {
             byte[] keyBytes = random(32), salt = random(16), iv = new byte[12];
             SecretKey wrapping = derivePinKey(pin, salt);
@@ -198,6 +198,19 @@ public class NativeSecurityPlugin extends Plugin {
             });
             prompt.authenticate(promptInfo("Déverrouiller WorshipFlow"), new BiometricPrompt.CryptoObject(cipher));
         } catch (Exception e) { call.reject("Biométrie indisponible; utilisez le PIN.", e); }
+    }
+    @PluginMethod public void disableSecurity(PluginCall call) {
+        try {
+            requireUnlocked(call);
+            KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+            store.load(null);
+            if (store.containsAlias(BIO_ALIAS)) store.deleteEntry(BIO_ALIAS);
+            boolean cleared = prefs().edit().clear().commit();
+            if (!cleared) throw new IllegalStateException("Effacement de la configuration impossible.");
+            if (dataKey != null) Arrays.fill(dataKey, (byte) 0);
+            dataKey = null;
+            JSObject out = new JSObject(); out.put("disabled", true); call.resolve(out);
+        } catch (Exception e) { call.reject("Désactivation du verrouillage impossible : " + e.getMessage(), e); }
     }
     @PluginMethod public void lock(PluginCall call) {
         if (dataKey != null) Arrays.fill(dataKey, (byte) 0);
