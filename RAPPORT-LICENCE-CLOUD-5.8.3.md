@@ -32,4 +32,4 @@ Aucune activation payante, licence propriétaire ou synchronisation avec un comp
 
 La vérification JavaScript locale apporte un contrôle fonctionnel ; une version HTML modifiable peut être contournée. Le contrôle d’accès réel aux données Cloud est assuré par le backend. Le stockage audio n’est pas un service de transfert des fichiers MP3.
 
-Les APK de la PR sont des candidats de test, pas une livraison de production validée. La PR reste ouverte jusqu’au test de l’essai réel et des connexions réelles. Main n’est pas modifiée.
+Cette intégration est préparée dans la branche dédiée de reprise depuis le main actuel. Les APK de cette branche restent des candidats de test, pas une livraison de production validée. Garder la PR ouverte jusqu’à l’enregistrement et l’activation de WORSHIPFLOW, au test réel de l’essai, à une connexion Cloud autorisée et à la synchronisation avec un compte réel.
