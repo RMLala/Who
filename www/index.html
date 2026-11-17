@@ -226,10 +226,26 @@ const DB=new Promise((ok,ko)=>{const r=indexedDB.open('wf',2);r.onupgradeneeded=
 const tx=async(s,m,f)=>{const d=await DB;return new Promise((ok,ko)=>{const t=d.transaction(s,m),q=f(t.objectStore(s));t.oncomplete=()=>{if(m==='readwrite'&&['songs','services','insps'].includes(s))afGeneration++;ok(q&&q.result)};t.onerror=()=>ko(t.error)})};
 const rawPut=(s,v,k)=>tx(s,'readwrite',o=>k===undefined?o.put(v):o.put(v,k)),rawGet=(s,k)=>tx(s,'readonly',o=>o.get(k)),rawAll=s=>tx(s,'readonly',o=>o.getAll()),del=(s,k)=>tx(s,'readwrite',o=>o.delete(k));
 const NativeSecurityAPI=window.Capacitor&&typeof Capacitor.registerPlugin==='function'?Capacitor.registerPlugin('NativeSecurity'):null;
-const SECURE_STORES=new Set(['songs','services','insps','kv']);let secureStorageEnabled=false;
+const SECURE_STORES=new Set(['songs','services','insps','kv','audio']);let secureStorageEnabled=false;
+const rawEntries=async s=>{const d=await DB;return new Promise((ok,ko)=>{const out=[],t=d.transaction(s,'readonly'),q=t.objectStore(s).openCursor();q.onsuccess=()=>{const c=q.result;if(c){out.push({key:c.key,value:c.value});c.continue()}};q.onerror=()=>ko(q.error);t.oncomplete=()=>ok(out);t.onerror=()=>ko(t.error)})};
 const secureCipher=async value=>{const r=await NativeSecurityAPI.encrypt({value:JSON.stringify(value)});return r.value};
-const secureDecode=async value=>{if(!value||typeof value!=='object'||!value.__wfEncrypted)return value;const r=await NativeSecurityAPI.decrypt({value:value.__wfEncrypted});return JSON.parse(r.value)};
-const put=async(s,v,k)=>{if(!secureStorageEnabled||!SECURE_STORES.has(s))return rawPut(s,v,k);const cipher=await secureCipher(v);const wrapped=['songs','services','insps'].includes(s)?{id:v.id,__wfEncrypted:cipher}:{__wfEncrypted:cipher};return rawPut(s,wrapped,k)};
+const secureUncipher=async value=>JSON.parse((await NativeSecurityAPI.decrypt({value})).value);
+const wfBytes64=bytes=>{let out='';for(let i=0;i<bytes.length;i+=8192)out+=String.fromCharCode(...bytes.subarray(i,Math.min(i+8192,bytes.length)));return btoa(out)};
+const secureSeal=async value=>{
+  if(typeof Blob!=='undefined'&&value instanceof Blob){
+    const bytes=new Uint8Array(await value.arrayBuffer()),chunks=[];
+    for(let i=0;i<bytes.length;i+=524288)chunks.push(await secureCipher({b64:wfBytes64(bytes.subarray(i,Math.min(i+524288,bytes.length)))}));
+    return {__wfEncryptedBlob:{type:value.type||'application/octet-stream',size:value.size,chunks}};
+  }
+  return {__wfEncrypted:await secureCipher(value)};
+};
+const secureDecode=async value=>{
+  if(!value||typeof value!=='object')return value;
+  if(value.__wfEncrypted){return secureUncipher(value.__wfEncrypted)}
+  if(value.__wfEncryptedBlob){const meta=value.__wfEncryptedBlob,parts=[];for(const c of meta.chunks){const x=await secureUncipher(c),bin=atob(x.b64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);parts.push(bytes)}return new Blob(parts,{type:meta.type})}
+  return value;
+};
+const put=async(s,v,k)=>{if(!secureStorageEnabled||!SECURE_STORES.has(s))return rawPut(s,v,k);const sealed=await secureSeal(v);const wrapped=['songs','services','insps'].includes(s)?{id:v.id,...sealed}:sealed;return rawPut(s,wrapped,k)};
 const get=async(s,k)=>secureDecode(await rawGet(s,k));
 const all=async s=>Promise.all((await rawAll(s)).map(secureDecode));
 const $=s=>document.querySelector(s),esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -820,12 +836,12 @@ async function securityUnlock(){
   secureStorageEnabled=true;
   // Idempotent migration: existing IndexedDB records stay readable if the app closes mid-migration.
   for(const store of SECURE_STORES){
-    const rows=await rawAll(store);
-    for(const row of rows){
-      if(row&&typeof row==='object'&&row.__wfEncrypted)continue;
-      const key=['songs','services','insps'].includes(store)?row.id:undefined;
-      const cipher=await secureCipher(row);
-      const wrapped=key===undefined?{__wfEncrypted:cipher}:{id:key,__wfEncrypted:cipher};
+    const entries=await rawEntries(store);
+    for(const entry of entries){
+      const row=entry.value;
+      if(row&&typeof row==='object'&&(row.__wfEncrypted||row.__wfEncryptedBlob))continue;
+      const sealed=await secureSeal(row),key=entry.key;
+      const wrapped=['songs','services','insps'].includes(store)?{id:key,...sealed}:sealed;
       await rawPut(store,wrapped,key);
     }
   }
