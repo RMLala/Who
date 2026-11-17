@@ -224,7 +224,14 @@ en:[['hira','Welcome','Prepare your songs, services and inspirations, then lead 
 let afGeneration=0;
 const DB=new Promise((ok,ko)=>{const r=indexedDB.open('wf',2);r.onupgradeneeded=()=>{const d=r.result,mk=(n,o)=>{if(!d.objectStoreNames.contains(n))d.createObjectStore(n,o)};mk('songs',{keyPath:'id'});mk('services',{keyPath:'id'});mk('insps',{keyPath:'id'});mk('audio');mk('kv')};r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)});
 const tx=async(s,m,f)=>{const d=await DB;return new Promise((ok,ko)=>{const t=d.transaction(s,m),q=f(t.objectStore(s));t.oncomplete=()=>{if(m==='readwrite'&&['songs','services','insps'].includes(s))afGeneration++;ok(q&&q.result)};t.onerror=()=>ko(t.error)})};
-const put=(s,v,k)=>tx(s,'readwrite',o=>k===undefined?o.put(v):o.put(v,k)),get=(s,k)=>tx(s,'readonly',o=>o.get(k)),all=s=>tx(s,'readonly',o=>o.getAll()),del=(s,k)=>tx(s,'readwrite',o=>o.delete(k));
+const rawPut=(s,v,k)=>tx(s,'readwrite',o=>k===undefined?o.put(v):o.put(v,k)),rawGet=(s,k)=>tx(s,'readonly',o=>o.get(k)),rawAll=s=>tx(s,'readonly',o=>o.getAll()),del=(s,k)=>tx(s,'readwrite',o=>o.delete(k));
+const NativeSecurityAPI=window.Capacitor&&typeof Capacitor.registerPlugin==='function'?Capacitor.registerPlugin('NativeSecurity'):null;
+const SECURE_STORES=new Set(['songs','services','insps','kv']);let secureStorageEnabled=false;
+const secureCipher=async value=>{const r=await NativeSecurityAPI.encrypt({value:JSON.stringify(value)});return r.value};
+const secureDecode=async value=>{if(!value||typeof value!=='object'||!value.__wfEncrypted)return value;const r=await NativeSecurityAPI.decrypt({value:value.__wfEncrypted});return JSON.parse(r.value)};
+const put=async(s,v,k)=>{if(!secureStorageEnabled||!SECURE_STORES.has(s))return rawPut(s,v,k);const cipher=await secureCipher(v);const wrapped=['songs','services','insps'].includes(s)?{id:v.id,__wfEncrypted:cipher}:{__wfEncrypted:cipher};return rawPut(s,wrapped,k)};
+const get=async(s,k)=>secureDecode(await rawGet(s,k));
+const all=async s=>Promise.all((await rawAll(s)).map(secureDecode));
 const $=s=>document.querySelector(s),esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const AUD='audio/*,.mp3,.m4a',F=['Lora,Georgia,serif','"Palatino Linotype","Book Antiqua",serif','"Times New Roman",Times,serif','"Noto Serif","Droid Serif",serif','Inter,Roboto,"Helvetica Neue",Arial,sans-serif','"Trebuchet MS","Segoe UI",sans-serif','Verdana,Geneva,sans-serif','"sans-serif-condensed","Roboto Condensed",sans-serif','"sans-serif-light","Roboto Light",sans-serif','casual,"Comic Sans MS",cursive','cursive,"Brush Script MT",cursive','"Courier New",monospace'],TH=['scene','clair','nuit','vert','sepia','contraste'];
 Object.assign(D.fr,{textSize:'Taille du texte',selectThemes:'Sélectionner les thèmes',noThemes:'Aucun thème disponible'});
@@ -774,5 +781,60 @@ async function afResolve(which){if(AF.syncing||!AF.conflict)return;if(!confirm(a
 async function afInit(){try{AF.installation=await get('kv','appforge-installation');if(!AF.installation){AF.installation=crypto.randomUUID();await put('kv',AF.installation,'appforge-installation')}AF.license=(await get('kv','appforge-license'))||{};AF.cloud={...AF.cloud,...((await get('kv','appforge-cloud'))||{})};try{if(AF.license.active&&AF.license.token)await afVerify(AF.license.token,AF.installation);else AF.license.active=false}catch(e){AF.license.active=false;afStatus(e.message)}AF.ready=true;afGate();if(navigator.onLine&&AF.license.token)await afLicense('status');AF.timer=setInterval(()=>{if(AF.license.expires&&Date.parse(AF.license.expires)<=Date.now()){AF.license.active=false;afGate()}if(AF.cloud.enabled)afSync()},30000)}catch(e){afStatus(e.message);toast('AppForge : '+e.message)}}
 window.addEventListener('online',()=>{if(AF.license.token)afLicense('status');if(AF.cloud.enabled)afSync()});
 
-load().then(afInit);
+
+function securityPinDialog(title,confirmPin){
+  return new Promise(resolve=>{
+    const layer=document.createElement('div');layer.setAttribute('role','dialog');layer.setAttribute('aria-modal','true');
+    layer.style.cssText='position:fixed;inset:0;z-index:100000;background:#07111feF;display:grid;place-items:center;padding:20px;font:16px Inter,Arial,sans-serif';
+    const card=document.createElement('form');card.style.cssText='width:min(100%,390px);background:#fff;color:#142238;border-radius:20px;padding:24px;box-shadow:0 20px 70px #0008';
+    const heading=document.createElement('h2');heading.textContent=title;heading.style.cssText='margin:0 0 8px;font-size:21px';
+    const help=document.createElement('p');help.textContent='Entrez un PIN de 6 à 12 chiffres. Il protège le stockage local et sert de secours à la biométrie.';help.style.cssText='color:#59677a;line-height:1.45;margin:0 0 16px';
+    const input=document.createElement('input');input.type='password';input.inputMode='numeric';input.autocomplete='off';input.pattern='[0-9]{6,12}';input.minLength=6;input.maxLength=12;input.required=true;input.placeholder='PIN (6 à 12 chiffres)';input.style.cssText='box-sizing:border-box;width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:10px;font-size:18px;letter-spacing:.2em';
+    const error=document.createElement('div');error.setAttribute('aria-live','polite');error.style.cssText='color:#b42318;min-height:22px;margin-top:8px;font-size:13px';
+    const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;margin-top:12px';
+    const submit=document.createElement('button');submit.type='submit';submit.textContent=confirmPin?'Continuer':'Déverrouiller';submit.style.cssText='flex:1;border:0;border-radius:10px;padding:13px;background:#146c5a;color:white;font-weight:700';
+    const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Annuler';cancel.style.cssText='border:1px solid #cbd5e1;border-radius:10px;padding:13px;background:#fff;color:#263445';
+    actions.append(submit,cancel);card.append(heading,help,input,error,actions);layer.append(card);document.body.append(layer);
+    cancel.onclick=()=>{layer.remove();resolve(null)};card.onsubmit=e=>{e.preventDefault();const pin=input.value;if(!/^[0-9]{6,12}$/.test(pin)){error.textContent='Le PIN doit contenir 6 à 12 chiffres.';return}layer.remove();resolve(pin)};
+    input.focus();
+  });
+}
+async function securityUnlock(){
+  if(!NativeSecurityAPI)throw new Error('Le verrouillage sécurisé nécessite l’application Android WorshipFlow.');
+  const status=await NativeSecurityAPI.status();
+  if(!status.configured){
+    const first=await securityPinDialog('Sécuriser WorshipFlow',true);if(!first)throw new Error('Configuration de sécurité annulée.');
+    const second=await securityPinDialog('Confirmer le PIN',true);if(!second)throw new Error('Configuration de sécurité annulée.');
+    if(first!==second)throw new Error('Les deux PIN ne correspondent pas. Fermez et relancez WorshipFlow pour recommencer.');
+    const configured=await NativeSecurityAPI.configurePin({pin:first});
+    if(configured.message)console.info(configured.message);
+  }else{
+    let unlocked=false;
+    if(status.biometricEnabled&&status.biometricAvailable){try{await NativeSecurityAPI.unlockWithBiometrics();unlocked=true}catch(e){console.info('Biométrie indisponible; PIN de secours proposé.')}}
+    while(!unlocked){
+      const pin=await securityPinDialog(status.biometricEnabled?'PIN de secours':'Déverrouiller WorshipFlow',false);
+      if(!pin)throw new Error('Déverrouillage annulé.');
+      try{await NativeSecurityAPI.unlockWithPin({pin});unlocked=true}catch(e){alert('PIN incorrect. Réessayez.')}
+    }
+  }
+  secureStorageEnabled=true;
+  // Idempotent migration: existing IndexedDB records stay readable if the app closes mid-migration.
+  for(const store of SECURE_STORES){
+    const rows=await rawAll(store);
+    for(const row of rows){
+      if(row&&typeof row==='object'&&row.__wfEncrypted)continue;
+      const key=['songs','services','insps'].includes(store)?row.id:undefined;
+      const cipher=await secureCipher(row);
+      const wrapped=key===undefined?{__wfEncrypted:cipher}:{id:key,__wfEncrypted:cipher};
+      await rawPut(store,wrapped,key);
+    }
+  }
+}
+async function securityStart(){
+  const errorBox=document.getElementById('security-error');
+  try{await securityUnlock();await load();await afInit();}
+  catch(e){console.error(e);document.body.innerHTML='<main style="font:16px Arial;max-width:520px;margin:12vh auto;padding:24px;color:#17233a"><h1>WorshipFlow est verrouillé</h1><p>'+esc(e.message||'La sécurité locale n’a pas pu être activée.')+'</p><p>Fermez puis relancez l’application. Les données existantes n’ont pas été supprimées.</p></main>';}
+}
+
+securityStart();
 </script></body></html>
