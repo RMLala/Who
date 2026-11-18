@@ -803,9 +803,9 @@ function afCloudStore(){
  return {get:async key=>{
   if(key===installKey)return AF.installation||'';
   if(key===entitlementKey){
+   if(AF.sdkRecord)return JSON.stringify(AF.sdkRecord);
    const stored=await get('kv','appforge-cloud-entitlement');
    if(stored&&typeof stored==='object'){const record={...stored};if(!record.licenseToken&&AF.license.token)record.licenseToken=AF.license.token;AF.sdkRecord=record;return JSON.stringify(record)}
-   if(AF.sdkRecord)return JSON.stringify(AF.sdkRecord);
    const seeded={version:1,revisions:{},fingerprints:{}};
    if(AF.license.token)seeded.licenseToken=AF.license.token;
    AF.sdkRecord=seeded;return JSON.stringify(seeded)
