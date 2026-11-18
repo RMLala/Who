@@ -814,15 +814,15 @@ function afCloudStore(){
  },set:async(key,value)=>{
   if(key===installKey){AF.installation=value;await put('kv',value,'appforge-installation');return}
   if(key===entitlementKey){const record=JSON.parse(value);AF.sdkRecord=record;if(secureStorageEnabled)await put('kv',record,'appforge-cloud-entitlement')}
- },remove:async key=>{if(key===entitlementKey){AF.sdkRecord=null;await del('kv','appforge-cloud-entitlement')}}
+ },remove:async key=>{if(key===entitlementKey){AF.sdkRecord=null}}
  }
 }
 function afCloudClient(){
  if(!AF.sdk){
-  AF.sdk=AppForgeCloudSync.create({apiBase:AF_CONFIG.license,productId:AF_CONFIG.product,store:afCloudStore(),data:{getSnapshot:afSnapshot,applySnapshot:async snapshot=>afApply(afValidateSnapshot(snapshot))},onStatus:state=>{
+  AF.sdk=AppForgeCloudSync.create({apiBase:AF_CONFIG.license,productId:AF_CONFIG.product,store:afCloudStore(),fetch:(...args)=>fetch(...args),data:{getSnapshot:afSnapshot,applySnapshot:async snapshot=>afApply(afValidateSnapshot(snapshot))},onStatus:state=>{
    const record=AF.sdkRecord||{},valid=!!record.cloudToken&&Number.isFinite(Date.parse(record.cloudExpiresAt||''))&&Date.parse(record.cloudExpiresAt)>Date.now();
    AF.cloud.token=valid?record.cloudToken:'';AF.cloud.tokenExpiresAt=valid?record.cloudExpiresAt:null;
-   AF.cloud.rights={cloud:!!record.licenseToken};
+   AF.cloud.rights={cloud:!!record.cloudToken};
    if(state.state==='synced'&&valid){AF.cloud.status='connected';AF.cloud.lastSync=Date.now();AF.cloud.error='';AF.conflict=null;afStatus(afText('Synchronisation réussie.','Vita ny fampifanarahana.','Sync completed.'))}
    else if(state.state==='offline'){AF.cloud.status='offline';AF.cloud.error=afText('Hors ligne · les données locales sont conservées.','Tsy misy Internet · voatahiry eto an-toerana ny angona.','Offline · local data is preserved.')}
    else if(state.state==='conflict'||state.state==='remote-available'){AF.cloud.status='conflict';AF.conflict=state;AF.cloud.error=afText('Conflit Cloud · aucune donnée n’a été écrasée.','Tsy mifanaraka · tsy nisy angona nosoloina.','Cloud conflict · no data was overwritten.')}
@@ -851,7 +851,7 @@ async function afResolve(which){
  if(AF.syncing||!AF.conflict)return;
  if(!confirm(afText('Remplacer la version '+(which==='cloud'?'locale':'cloud')+' ? Une copie locale sera conservée.','Hosoloina ny kinova? Hotahirizina aloha ny kopia eto an-toerana.','Replace the '+(which==='cloud'?'device':'cloud')+' version? A local recovery copy is retained.')))return;
  AF.syncing=true;
- try{const sdk=afCloudClient();const result=which==='cloud'?await sdk.chooseRemote():await sdk.chooseLocal();if(result.state==='synced'){AF.conflict=null;AF.cloud.status='connected';AF.cloud.lastSync=Date.now()}else if(result.state==='conflict'){AF.conflict=result;AF.cloud.status='conflict'}await afPersist();afStatus('Synchronisation réussie.');if(tab==='reg')render()}
+ try{const sdk=afCloudClient();const result=which==='cloud'?await sdk.chooseRemote():await sdk.chooseLocal();if(result.state==='synced'){const record=AF.sdkRecord||{},valid=!!record.cloudToken&&Date.parse(record.cloudExpiresAt||'')>Date.now();AF.conflict=null;AF.cloud.status=valid?'connected':'pending';AF.cloud.token=valid?record.cloudToken:'';AF.cloud.tokenExpiresAt=valid?record.cloudExpiresAt:null;AF.cloud.lastSync=valid?Date.now():AF.cloud.lastSync}else if(result.state==='conflict'){AF.conflict=result;AF.cloud.status='conflict'}await afPersist();afStatus('Synchronisation réussie.');if(tab==='reg')render()}
  catch(e){afStatus(e.message);toast(e.message)}
  finally{AF.syncing=false}
 }
