@@ -149,11 +149,11 @@ public class NativeSecurityPlugin extends Plugin {
             byte[] keyBytes = random(32), salt = random(16), iv = new byte[12];
             SecretKey wrapping = derivePinKey(pin, salt);
             byte[] wrapped = aesEncrypt(wrapping, keyBytes, iv);
-            prefs().edit().putString("pinSalt", b64(salt)).putString("pinIv", b64(iv))
+            boolean saved = prefs().edit().putString("pinSalt", b64(salt)).putString("pinIv", b64(iv))
                     .putString("pinWrapped", b64(wrapped)).putInt("pinLength", 4).remove("bioIv").remove("bioWrapped").commit();
+            if (!saved) throw new IllegalStateException("Écriture du PIN impossible.");
             dataKey = keyBytes;
-            if (biometricAvailable()) saveBiometricWrap(call, keyBytes);
-            else { JSObject out = new JSObject(); out.put("configured", true); out.put("biometricEnabled", false); call.resolve(out); }
+            JSObject out = new JSObject(); out.put("configured", true); out.put("biometricEnabled", false); call.resolve(out);
         } catch (Exception e) { call.reject("Configuration de la sécurité impossible : " + e.getMessage(), e); }
     }
     @PluginMethod public void unlockWithPin(PluginCall call) {
@@ -198,6 +198,24 @@ public class NativeSecurityPlugin extends Plugin {
             });
             prompt.authenticate(promptInfo("Déverrouiller WorshipFlow"), new BiometricPrompt.CryptoObject(cipher));
         } catch (Exception e) { call.reject("Biométrie indisponible; utilisez le PIN.", e); }
+    }
+    @PluginMethod public void enableBiometrics(PluginCall call) {
+        try {
+            requireUnlocked(call);
+            if (!biometricAvailable()) { call.reject("Aucune biométrie forte n’est configurée sur cet appareil."); return; }
+            saveBiometricWrap(call, dataKey);
+        } catch (Exception e) { call.reject("Activation de la biométrie impossible : " + e.getMessage(), e); }
+    }
+    @PluginMethod public void disableBiometrics(PluginCall call) {
+        try {
+            requireUnlocked(call);
+            boolean saved = prefs().edit().remove("bioIv").remove("bioWrapped").commit();
+            if (!saved) throw new IllegalStateException("Désactivation de la biométrie impossible.");
+            KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+            store.load(null);
+            if (store.containsAlias(BIO_ALIAS)) store.deleteEntry(BIO_ALIAS);
+            JSObject out = new JSObject(); out.put("biometricEnabled", false); call.resolve(out);
+        } catch (Exception e) { call.reject("Désactivation de la biométrie impossible : " + e.getMessage(), e); }
     }
     @PluginMethod public void disableSecurity(PluginCall call) {
         try {
