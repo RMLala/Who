@@ -26,44 +26,51 @@ SDK source : https://github.com/RMLala/appforg/blob/main/cloud/license-worker/cl
 
 ## Tests exécutés
 
-Workflow WorshipFlow : https://github.com/RMLala/Who/actions/runs/44367395819
+Workflow WorshipFlow : https://github.com/RMLala/Who/actions/runs/44369757026
 
-- Tests Node du dépôt : réussite, incluant activation simulée, jeton, upload d’un snapshot, état hors ligne et absence de jeton en clair par défaut.
+- Tests Node du dépôt et test de contrat SDK : réussite; les appels Worker sont simulés.
 - Smoke test navigateur : réussite en viewport 390 px et 1280 px.
 - Build Debug API 23 et API 29 : réussite.
-- Build Release signé et vérification des signatures : en cours au moment de ce rapport.
+- Build Release signé API 23/29 et vérification des signatures : réussite.
 - Workflows de conformité AppForge V3 : réussis.
 
-Les appels d’activation et de synchronisation automatisés utilisent des réponses Worker simulées. Ils ne prouvent pas l’activation MVola ni la synchronisation D1 en production.
+Ces contrôles ne prouvent pas l’activation d’une licence réelle ni la synchronisation D1 de production.
 
-## Contrat HTTP du Worker central et du SDK
+## Contrat HTTP de la source officielle et du SDK
 
-Le code source actuel de `RMLala/appforg/cloud/license-worker/src/index.js` route `GET` et `PUT` sur le chemin exact `/v1/cloud/snapshot`. Le SDK officiel `client/appforge-cloud-sync.js` utilise le même chemin et :
+La source officielle `RMLala/appforg/cloud/license-worker/src/index.js` (version `76f2be77705073874570748ec3b2a326cf3db7ff`) route explicitement `GET` et `PUT` sur `/v1/cloud/snapshot`. Le SDK officiel (version `9a06175c9ca610f8c99474fa165abc311de414c5`) :
 
 - envoie `GET /v1/cloud/snapshot?resource=default` par défaut ;
-- envoie le jeton de synchronisation dans `Authorization: Bearer <cloudToken>` ;
-- écrit avec `PUT /v1/cloud/snapshot?resource=default` et le JSON `{ "expectedRevision": 0, "snapshot": {} }` ;
-- attend une révision compare-and-swap; le Worker renvoie le snapshot courant avec HTTP 409 en cas de conflit.
+- envoie le jeton dans `Authorization: Bearer <cloudToken>` ;
+- écrit par `PUT` au même chemin avec `{ "expectedRevision": n, "snapshot": {...} }` ;
+- utilise une révision compare-and-swap; la source renvoie le snapshot courant avec HTTP 409 en cas de conflit.
 
-Le Worker exige ce jeton avant de lire ou d’écrire D1.
+Le Worker source valide le jeton avant d’accéder à D1. Le client WorshipFlow conserve ces méthodes et routes.
 
-## Vérification de l’instance de production
+## Comparaison du Worker déployé
 
-- `GET /health` retourne `ok:true`.
-- `GET /v1/config` retourne la clé publique attendue et `protocol: appforge-license-v1`.
-- Une requête navigateur `GET /v1/cloud/snapshot?resource=default` sans jeton a retourné `{"error":"Route inconnue."}`. Comme elle ne comportait aucun jeton Bearer, ce résultat ne valide pas le chemin authentifié ni l’accès D1. Il diffère cependant du code source actuel, qui devrait rejeter l’absence de jeton avec HTTP 401. Une requête authentifiée exige une licence de test et n’a pas encore été réalisée.
+URL contrôlée : `https://appforge-license-api.appforge-licences-mg.workers.dev`, identique à celle configurée dans WorshipFlow.
 
-La PR reste ouverte; aucune synchronisation de production n’est déclarée réussie.
+Constats HTTP du 18 novembre 2026 :
+
+- `GET /health` : HTTP 200, `{"ok":true,"service":"AppForge License API",...}`.
+- `GET /v1/config` : HTTP 200, `protocol: appforge-license-v1`.
+- `GET /v1/cloud/snapshot?resource=default` sans jeton : HTTP 404, `{"error":"Route inconnue."}`.
+- `OPTIONS /v1/cloud/snapshot?resource=default` avec préflight `PUT` : HTTP 204, mais `Access-Control-Allow-Methods: GET, POST, OPTIONS`, sans `PUT`.
+
+La source officielle devrait reconnaître le GET et répondre HTTP 401 lorsque le jeton manque; ses en-têtes CORS déclarent aussi PUT. L’instance répond donc bien sur l’URL centrale, mais son comportement déployé est incompatible avec la source officielle observée. Cela indique vraisemblablement que le Worker actuellement publié n’est pas à cette version de la source (inférence fondée sur les réponses HTTP et le code source). Aucun jeton ni aucune requête d’écriture anonyme n’a été envoyé.
+
+La PR reste ouverte. Aucune synchronisation D1 n’est annoncée comme opérationnelle.
 
 ## Restant à valider
 
-- Avec un jeton Cloud obtenu par une licence de test, appeler le GET authentifié puis écrire/lire un snapshot D1 et vérifier la révision retournée. Comparer le résultat au code source avant toute correction côté application.
-- Activer une licence de test autorisée et valider l’émission/renouvellement du jeton ainsi qu’un snapshot D1.
-- Tester deux appareils autorisés, révocation/expiration, conflits réels, perte et reprise réseau, absence de doublons et isolation entre licences.
-- La vérification MVola réelle nécessite une activation de test; aucun code de licence n’a été fourni pour ce travail.
+- AppForge doit vérifier et aligner le déploiement du Worker central sur la source officielle; aucun Worker distinct et aucune route alternative ne sont créés côté WorshipFlow.
+- Ensuite, avec une licence de test valide : activation, émission du jeton, GET authentifié, PUT d’un instantané et GET de vérification via D1, puis reprise hors ligne/réseau.
+- Tester deux appareils autorisés, révocation/expiration, conflits réels, absence de doublons et isolation entre licences.
+- Aucun code de licence de test valide n’a été fourni; les étapes production ci-dessus restent non exécutées.
 
-## Workflow de validation du contrat SDK
+## Workflow de validation du client
 
-Le workflow WorshipFlow #99 a terminé avec succès le 18 novembre 2026 : tests Node et smoke navigateur, build Debug API 23/29, builds Release signés API 23/29 et vérification des signatures. Le test vérifie également la requête SDK : GET avec Bearer, puis PUT sur le chemin snapshot avec `expectedRevision` et `snapshot`. Ce sont toujours des tests simulés et ils ne valident pas la D1 de production.
+Le workflow #99 a réussi le 18 novembre 2026 : tests, smoke navigateur, builds Debug API 23/29, builds Release signés API 23/29 et vérification de signatures. Les tests d’activation, jeton et snapshots restent simulés.
 
 https://github.com/RMLala/Who/actions/runs/44369757026
