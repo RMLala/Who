@@ -134,6 +134,14 @@ jobs:
           path: android/app/build/outputs/apk/api29/release/*.apk
           if-no-files-found: error
           retention-days: 90
+      - name: Archive signed API29 APK in Google Drive
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: RMLala/android-template/.github/actions/upload-api29-drive@main
+        with:
+          apk-glob: 'android/app/build/outputs/apk/api29/release/*.apk'
+          application: 'WorshipFlow'
+          folder-id: '13aiSvGllh1nDLkvTVfpb7QOOxgi0YyQ5'
+          service-account-json: ${{ secrets.DRIVE_SERVICE_ACCOUNT_JSON }}
       - name: Remove temporary keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/android-release.jks"
