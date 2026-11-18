@@ -156,6 +156,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
 </style></head><body>
 <div id="spl"><img alt=""><h1>WorshipFlow</h1></div><header><img id="lg" width="36" height="36" alt=""><h1>WorshipFlow</h1><span class="hu"><button id="un" class="ib sm" onclick="undoA()" aria-label="undo" hidden></button><button id="re" class="ib sm" onclick="redoA()" aria-label="redo" hidden></button></span></header><div class="mq" id="mq" onclick="mqM()"><span></span></div>
 <div id="main"></div><nav id="nv"></nav><div id="md" hidden></div><div id="stage" hidden></div><div id="pr"></div><div id="cf" hidden></div><div id="ts" hidden></div>
+<script src="appforge-cloud-sync.js"></script>
 <script>
 const NativeAudioAPI=window.Capacitor?(typeof Capacitor.registerPlugin=='function'?Capacitor.registerPlugin('NativeAudio'):(Capacitor.Plugins&&Capacitor.Plugins.NativeAudio)||null):null;
 const D={
@@ -741,7 +742,7 @@ const oldStats=vSta;vSta=function(){const base=oldStats(),lim=new Date(Date.now(
 
 document.addEventListener('fullscreenchange',()=>{if(!NativeAudioAPI){immersive=!!document.fullscreenElement;$('#stage').classList.toggle('immersive',immersive)}});
 /* AppForge integration: no admin secret, password or audio is included in snapshots. */
-const AF_CONFIG=Object.freeze({license:'https://appforge-license-api.appforge-licences-mg.workers.dev',cloud:'https://appforge-cloud-sync-api.appforge-licences-mg.workers.dev',product:'WORSHIPFLOW',app:'worshipflow',key:{kty:'EC',crv:'P-256',x:'PZdjR-o7j1_IHcy5lOSwJgZ4_QSOlfYANDtznJtv4Nw',y:'2edphnUcQ7PJra_gjTKskTLNNueAeNCc7p73xkBDu1Y',ext:true,key_ops:['verify']}});
+const AF_CONFIG=Object.freeze({license:'https://appforge-license-api.appforge-licences-mg.workers.dev',cloud:'https://appforge-license-api.appforge-licences-mg.workers.dev',product:'WORSHIPFLOW',app:'worshipflow',key:{kty:'EC',crv:'P-256',x:'PZdjR-o7j1_IHcy5lOSwJgZ4_QSOlfYANDtznJtv4Nw',y:'2edphnUcQ7PJra_gjTKskTLNNueAeNCc7p73xkBDu1Y',ext:true,key_ops:['verify']}});
 const afUn64=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
 async function afHash(text){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(n=>n.toString(16).padStart(2,'0')).join('')}
 async function afVerify(token,installation,now=Date.now()){
@@ -768,9 +769,92 @@ function afText(fr,mg,en){return set.lang==='mg'?mg:set.lang==='en'?en:fr}
 function afStatus(message){AF.message=message;const e=document.getElementById('af-message');if(e)e.textContent=message}
 async function afPersist(){await put('kv',AF.license,'appforge-license');const persisted={...AF.cloud,token:'',tokenExpiresAt:null};await put('kv',persisted,'appforge-cloud');}
 function afPanel(){const eligible=!!AF.license.active&&AF.license.kind==="license";const entitled=eligible&&AF.cloud.rights?.cloud===true;const connected=entitled&&AF.cloud.status==="connected"&&AF.cloud.token&&Date.parse(AF.cloud.tokenExpiresAt||"")>Date.now();return '<div class="card"><h3>AppForge · '+afText("Licence & Cloud","Lisansa & Cloud","License & Cloud")+'</h3><p>'+esc(AF.license.active?afText("Licence vérifiée","Lisansa voamarina","Verified license"):"Activation requise")+(AF.license.expires?' · '+esc(new Date(AF.license.expires).toLocaleDateString()):'')+'</p><p id="af-message" class="mu" role="status">'+esc(AF.message)+'</p><div class="bar"><button onclick="afLicense(\'trial\')">'+afText("Essai 3 jours","Andrana 3 andro","3 day trial")+'</button><button onclick="afActivation()">'+afText("Activer un code","Ampidiro ny kaody","Activate code")+'</button><button onclick="afLicense(\'status\')">'+afText("Vérifier","Hamarino","Verify")+'</button></div><p class="mu">MVola : 034 85 874 58 · '+afText("Mensuelle, annuelle, à vie ou propriétaire. Paiement validé manuellement par AppForge Studio avant activation.","Isam-bolana, isan-taona, mandrakizay na tompony.","Monthly, annual, lifetime or owner.")+'</p><hr><p>'+afText("Cloud automatique lié à la licence et à cet appareil. Aucun compte, e-mail, mot de passe ou organisation Cloud à configurer.","Cloud mandeha ho azy mifamatotra amin’ny lisansa sy ity fitaovana ity. Tsy mila kaonty, mailaka, teny miafina na fikambanana Cloud.","Cloud is automatic for this license and device. No Cloud account, email, password or organization setup.")+'</p><p><strong>'+afText("Droits Cloud","Zo Cloud","Cloud rights")+' :</strong> '+(entitled?afText("Accordé par le serveur","Neken’ny mpizara","Granted by the server"):eligible?afText("Vérification serveur requise","Mila fanamarinana amin’ny mpizara","Server verification required"):afText("Non disponible avec cet essai ou sans licence payante","Tsy misy amin’ity andrana ity","Unavailable with this trial or without a paid license"))+'</p><p><strong>'+afText("État Cloud","Toetry ny Cloud","Cloud status")+' :</strong> '+(connected?afText("Connecté","Mifandray","Connected"):entitled?(AF.cloud.status==="error"?afText("Erreur · données locales conservées","Hadisoana · voatahiry ny angona","Error · local data preserved"):afText("En attente de connexion sécurisée","Miandry fifandraisana azo antoka","Waiting for secure connection")):afText("Inactif","Tsy mandeha","Inactive"))+'</p><p>'+afText("Dernière synchronisation","Fampifanarahana farany","Last sync")+' : '+(AF.cloud.lastSync?esc(new Date(AF.cloud.lastSync).toLocaleString()):"—")+'</p>'+(eligible?'<div class="bar"><button class="pri" onclick="afSync(true)">'+afText("Synchroniser maintenant","Ampifanaraho izao","Sync now")+'</button></div>':'')+(AF.conflict?'<p class="warnt">'+afText("Conflit : choisissez quelle version conserver. Une copie locale sera conservée avant remplacement.","Tsy mifanaraka: fidio ny kinova tazonina.","Conflict: choose a version. A local recovery copy is saved before replacement.")+'</p><div class="bar"><button onclick="afResolve(\'cloud\')">Cloud → '+afText("appareil","fitaovana","device")+'</button><button onclick="afResolve(\'local\')">'+afText("Appareil","Fitaovana","Device")+' → Cloud</button></div>':'')+'<div class="bar"><button onclick="afRecovery()">'+afText("Exporter la copie de sécurité locale","Avoahy ny kopia fiarovana","Export local recovery copy")+'</button></div></div>'}function afActivation(){modal(`<h2>${afText('Activation','Fampandehanana','Activation')}</h2><label>Code<input id="af-code" autocomplete="off" maxlength="80"></label><div class="bar"><button class="pri" onclick="afLicense('activate',document.getElementById('af-code').value)">OK</button><button onclick="closeM()">${t('bk')}</button></div>`)}
-async function afLicense(action,code){if(AF.busy)return;AF.busy=true;try{const body={productId:AF_CONFIG.product,installationId:AF.installation};if(action==='activate'){if(!code||code.trim().length<12)throw Error('Code invalide.');body.code=code.trim()}if(action==='status'){if(!AF.license.token)throw Error('Démarrez un essai ou activez un code.');body.token=AF.license.token}const d=await afRequest(AF_CONFIG.license,'/v1/'+action,'POST',body);if(d.active===false)throw Error(d.error||'Licence inactive.');if(d.token){const claims=await afVerify(d.token,AF.installation);AF.license={token:d.token,active:true,expires:claims.exp||d.expiresAt||null,kind:claims.kind||'license',checked:Date.now()}}else{await afVerify(AF.license.token,AF.installation);AF.license.active=true;AF.license.checked=Date.now()}await afPersist();afStatus(afText('Licence vérifiée.','Voamarina ny lisansa.','License verified.'));if(action==='activate')closeM();afGate();if(tab==='reg')render();if(AF.license.kind==='license'&&navigator.onLine){try{await afCloudToken(true);await afSync(action==='activate')}catch(e){AF.cloud.status='error';AF.cloud.error=e.message;await afPersist();afStatus(afText('Licence active. Cloud indisponible : '+e.message,'Mavitrika ny lisansa. Tsy misy Cloud: '+e.message,'License active. Cloud unavailable: '+e.message))}}else if(AF.license.kind!=='license'){AF.cloud.enabled=false;AF.cloud.status='disconnected';await afPersist()}}catch(e){if(e.status===403||e.status===404){AF.license.active=false;AF.cloud.enabled=false;AF.cloud.status='disconnected';AF.cloud.token='';await afPersist()}afStatus(e.message);toast(e.message);afGate()}finally{AF.busy=false}}function afGate(){let gate=document.getElementById('af-gate');if(AF.license.active){gate?.remove();return}if(!gate){gate=document.createElement('div');gate.id='af-gate';gate.style.cssText='position:fixed;inset:0;z-index:100;background:var(--bg,#0b1626);overflow:auto;padding:24px;display:grid;align-content:center';document.body.append(gate)}gate.innerHTML=`<div style="width:min(700px,100%);margin:auto"><h2>WorshipFlow · AppForge</h2>${afPanel()}<button onclick="afExportLocal()">${afText('Exporter mes données locales','Avoahy ny angona eto an-toerana','Export my local data')}</button><p class="mu">${afText('Les données existantes sont conservées. Un premier accès Internet est nécessaire pour obtenir la preuve de licence signée.','Voatahiry ny angona efa misy. Mila Internet amin’ny voalohany hahazoana porofon’ny lisansa.','Existing data is preserved. Initial Internet access is required to obtain a signed license.')}</p></div>`}
-async function afCloudToken(force=false){if(!AF.license.active||AF.license.kind!=='license')throw Error('Une licence payante active est requise pour Cloud.');if(!navigator.onLine)throw Error('Hors ligne · les modifications locales sont conservées.');if(!force&&AF.cloud.token&&Date.parse(AF.cloud.tokenExpiresAt||'')>Date.now()+60000)return AF.cloud.token;const action=AF.cloud.token?'refresh':'issue';const d=await afRequest(AF_CONFIG.cloud,'/v2/session/'+action,'POST',{productId:AF_CONFIG.product,licenseToken:AF.license.token,installationId:AF.installation});if(d.active===false||d.cloud!==true||typeof d.token!=='string'||!d.expiresAt||Date.parse(d.expiresAt)<=Date.now())throw Error(d.error||'Le serveur n’a pas accordé un jeton Cloud valide.');AF.cloud={...AF.cloud,enabled:true,status:'connected',token:d.token,tokenExpiresAt:d.expiresAt,licenseId:d.licenseId||'',rights:d.rights||{cloud:true},error:''};await afPersist();return d.token}
-async function afCloudRequest(path,method='GET',body){const headers={'X-AppForge-License-Proof':AF.license.token,'X-AppForge-Installation':AF.installation};let token=await afCloudToken();try{return await afRequest(AF_CONFIG.cloud,path,method,body,token,headers)}catch(e){if(e.status!==401)throw e;AF.cloud.token='';AF.cloud.tokenExpiresAt=null;token=await afCloudToken(true);return afRequest(AF_CONFIG.cloud,path,method,body,token,headers)}}
+async function afLicense(action,code){if(AF.busy)return;AF.busy=true;try{
+ let d;
+ if(action==='activate'||action==='trial'){
+  const sdk=afCloudClient();
+  if(action==='activate'){if(!code||code.trim().length<12)throw Error('Code invalide.');d=await sdk.activate(code.trim())}
+  else d=await sdk.startTrial();
+  const record=AF.sdkRecord||{};if(!record.licenseToken)throw Error('Le Worker n’a pas confirmé la licence.');
+  const claims=await afVerify(record.licenseToken,AF.installation);
+  AF.license={token:record.licenseToken,active:true,expires:claims.exp||d.expiresAt||null,kind:claims.kind|| (action==='trial'?'trial':'license'),checked:Date.now()};
+  AF.cloud.rights={cloud:!!record.cloudToken};AF.cloud.enabled=!!record.cloudToken;
+  await afPersist();afStatus(afText('Licence vérifiée.','Voamarina ny lisansa.','License verified.'));
+  if(action==='activate')closeM();afGate();if(tab==='reg')render();
+ }else if(action==='status'){
+  if(!AF.license.token)throw Error('Démarrez un essai ou activez un code.');
+  d=await afRequest(AF_CONFIG.license,'/v1/status','POST',{productId:AF_CONFIG.product,installationId:AF.installation,token:AF.license.token});
+  if(d.active===false)throw Error(d.error||'Licence inactive.');
+  const claims=await afVerify(AF.license.token,AF.installation);AF.license={...AF.license,active:true,expires:claims.exp||d.expiresAt||AF.license.expires,checked:Date.now()};
+  await afPersist();afStatus(afText('Licence vérifiée.','Voamarina ny lisansa.','License verified.'));if(tab==='reg')render();
+ }
+ if(AF.license.kind==='license'&&navigator.onLine)await afSync(action==='activate');
+ else if(AF.license.kind!=='license'){AF.cloud.enabled=false;AF.cloud.status='disconnected';await afPersist()}
+ }catch(e){
+  const record=AF.sdkRecord||{};
+  if((action==='activate'||action==='trial')&&record.licenseToken){try{const claims=await afVerify(record.licenseToken,AF.installation);AF.license={token:record.licenseToken,active:true,expires:claims.exp||null,kind:claims.kind||'license',checked:Date.now()};await afPersist()}catch{}}
+  if(e.status===403||e.status===404){AF.license.active=false;AF.cloud.enabled=false;AF.cloud.status='disconnected';await afPersist()}
+  afStatus(e.message);toast(e.message);afGate()
+ }finally{AF.busy=false}}
+function afGate(){let gate=document.getElementById('af-gate');if(AF.license.active){gate?.remove();return}if(!gate){gate=document.createElement('div');gate.id='af-gate';gate.style.cssText='position:fixed;inset:0;z-index:100;background:var(--bg,#0b1626);overflow:auto;padding:24px;display:grid;align-content:center';document.body.append(gate)}gate.innerHTML=`<div style="width:min(700px,100%);margin:auto"><h2>WorshipFlow · AppForge</h2>${afPanel()}<button onclick="afExportLocal()">${afText('Exporter mes données locales','Avoahy ny angona eto an-toerana','Export my local data')}</button><p class="mu">${afText('Les données existantes sont conservées. Un premier accès Internet est nécessaire pour obtenir la preuve de licence signée.','Voatahiry ny angona efa misy. Mila Internet amin’ny voalohany hahazoana porofon’ny lisansa.','Existing data is preserved. Initial Internet access is required to obtain a signed license.')}</p></div>`}
+function afCloudStore(){
+ const installKey='appforge-install-v1:'+AF_CONFIG.product;
+ const entitlementKey='appforge-cloud-entitlement-v1:'+AF_CONFIG.product;
+ return {get:async key=>{
+  if(key===installKey)return AF.installation||'';
+  if(key===entitlementKey){
+   const stored=await get('kv','appforge-cloud-entitlement');
+   if(stored&&stored.licenseToken){AF.sdkRecord=stored;return JSON.stringify(stored)}
+   if(AF.sdkRecord)return JSON.stringify(AF.sdkRecord);
+   const seeded={version:1,revisions:{},fingerprints:{}};
+   if(AF.license.token)seeded.licenseToken=AF.license.token;
+   AF.sdkRecord=seeded;return JSON.stringify(seeded)
+  }
+  return null
+ },set:async(key,value)=>{
+  if(key===installKey){AF.installation=value;await put('kv',value,'appforge-installation');return}
+  if(key===entitlementKey){const record=JSON.parse(value);AF.sdkRecord=record;if(secureStorageEnabled)await put('kv',record,'appforge-cloud-entitlement')}
+ },remove:async key=>{if(key===entitlementKey){AF.sdkRecord=null;await del('kv','appforge-cloud-entitlement')}}
+ }
+}
+function afCloudClient(){
+ if(!AF.sdk){
+  AF.sdk=AppForgeCloudSync.create({apiBase:AF_CONFIG.license,productId:AF_CONFIG.product,store:afCloudStore(),data:{getSnapshot:afSnapshot,applySnapshot:async snapshot=>afApply(afValidateSnapshot(snapshot))},onStatus:state=>{
+   const record=AF.sdkRecord||{},valid=!!record.cloudToken&&Number.isFinite(Date.parse(record.cloudExpiresAt||''))&&Date.parse(record.cloudExpiresAt)>Date.now();
+   AF.cloud.token=valid?record.cloudToken:'';AF.cloud.tokenExpiresAt=valid?record.cloudExpiresAt:null;
+   AF.cloud.rights={cloud:!!record.licenseToken};
+   if(state.state==='synced'&&valid){AF.cloud.status='connected';AF.cloud.lastSync=Date.now();AF.cloud.error='';AF.conflict=null;afStatus(afText('Synchronisation réussie.','Vita ny fampifanarahana.','Sync completed.'))}
+   else if(state.state==='offline'){AF.cloud.status='offline';AF.cloud.error=afText('Hors ligne · les données locales sont conservées.','Tsy misy Internet · voatahiry eto an-toerana ny angona.','Offline · local data is preserved.')}
+   else if(state.state==='conflict'||state.state==='remote-available'){AF.cloud.status='conflict';AF.conflict=state;AF.cloud.error=afText('Conflit Cloud · aucune donnée n’a été écrasée.','Tsy mifanaraka · tsy nisy angona nosoloina.','Cloud conflict · no data was overwritten.')}
+   else if(state.state==='error'){AF.cloud.status='error';AF.cloud.error=state.error||afText('Synchronisation indisponible.','Tsy mandeha ny fampifanarahana.','Sync unavailable.')}
+   else if(state.state==='syncing'){AF.cloud.status=valid?'syncing':'pending'}
+   else if(state.state==='licensed'||state.state==='trial'){AF.cloud.status=valid?'pending':'disconnected'}
+   afPersist().catch(()=>{});if(tab==='reg')render()
+  }});
+ }
+ return AF.sdk
+}
+async function afSync(manual=false){
+ if(AF.syncing||AF.paused)return;
+ if(!AF.license.active||AF.license.kind!=='license'){if(manual)toast('Une licence payante active est requise.');return}
+ if(!navigator.onLine){AF.cloud.status='offline';AF.cloud.error='Hors ligne · données locales conservées.';afStatus(AF.cloud.error);await afPersist();return}
+ if(AF.conflict){if(manual){tab='reg';render()}return}
+ AF.syncing=true;
+ try{const sdk=afCloudClient();const result=AF.sdkStarted?await sdk.sync():await sdk.start();AF.sdkStarted=true;
+  if(result?.state==='remote-available'||result?.state==='conflict'){AF.conflict=result;AF.cloud.status='conflict';if(manual){tab='reg';render()}}
+  else if(result?.state==='offline'){AF.cloud.status='offline'}
+  if(result?.state==='error')throw Error(result.error||'Synchronisation indisponible.')
+ }catch(e){AF.cloud.status='error';AF.cloud.error=e.message;afStatus(e.message);if(manual)toast(e.message)}
+ finally{AF.syncing=false;await afPersist()}
+}
+async function afResolve(which){
+ if(AF.syncing||!AF.conflict)return;
+ if(!confirm(afText('Remplacer la version '+(which==='cloud'?'locale':'cloud')+' ? Une copie locale sera conservée.','Hosoloina ny kinova? Hotahirizina aloha ny kopia eto an-toerana.','Replace the '+(which==='cloud'?'device':'cloud')+' version? A local recovery copy is retained.')))return;
+ AF.syncing=true;
+ try{const sdk=afCloudClient();const result=which==='cloud'?await sdk.chooseRemote():await sdk.chooseLocal();if(result.state==='synced'){AF.conflict=null;AF.cloud.status='connected';AF.cloud.lastSync=Date.now()}else if(result.state==='conflict'){AF.conflict=result;AF.cloud.status='conflict'}await afPersist();afStatus('Synchronisation réussie.');if(tab==='reg')render()}
+ catch(e){afStatus(e.message);toast(e.message)}
+ finally{AF.syncing=false}
+}
 async function afEnable(value){if(value)await afSync(true);else{AF.cloud.enabled=false;await afPersist()}}
 async function afSnapshot(){const d={schema:1,app:'worshipflow',songs:await all('songs'),services:await all('services'),insps:await all('insps'),themes:(await get('kv','themes'))||[]};for(const s of d.songs){for(const k of ['audioUri','audioName','audioType','hasAudio','localOnly'])delete s[k]}return afValidateSnapshot(JSON.parse(JSON.stringify(d)))}
 function afCanonical(d){if(Array.isArray(d))return '['+d.map(afCanonical).join(',')+']';if(d&&typeof d==='object')return '{'+Object.keys(d).sort().map(k=>JSON.stringify(k)+':'+afCanonical(d[k])).join(',')+'}';return JSON.stringify(d)}
