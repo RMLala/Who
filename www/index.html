@@ -804,7 +804,7 @@ function afCloudStore(){
   if(key===installKey)return AF.installation||'';
   if(key===entitlementKey){
    const stored=await get('kv','appforge-cloud-entitlement');
-   if(stored&&stored.licenseToken){AF.sdkRecord=stored;return JSON.stringify(stored)}
+   if(stored&&typeof stored==='object'){const record={...stored};if(!record.licenseToken&&AF.license.token)record.licenseToken=AF.license.token;AF.sdkRecord=record;return JSON.stringify(record)}
    if(AF.sdkRecord)return JSON.stringify(AF.sdkRecord);
    const seeded={version:1,revisions:{},fingerprints:{}};
    if(AF.license.token)seeded.licenseToken=AF.license.token;
@@ -813,7 +813,7 @@ function afCloudStore(){
   return null
  },set:async(key,value)=>{
   if(key===installKey){AF.installation=value;await put('kv',value,'appforge-installation');return}
-  if(key===entitlementKey){const record=JSON.parse(value);AF.sdkRecord=record;if(secureStorageEnabled)await put('kv',record,'appforge-cloud-entitlement')}
+  if(key===entitlementKey){const record=JSON.parse(value);AF.sdkRecord=record;if(secureStorageEnabled)await put('kv',record,'appforge-cloud-entitlement');else{const metadata={...record};delete metadata.licenseToken;delete metadata.cloudToken;delete metadata.cloudExpiresAt;await put('kv',metadata,'appforge-cloud-entitlement')}}
  },remove:async key=>{if(key===entitlementKey){AF.sdkRecord=null}}
  }
 }
