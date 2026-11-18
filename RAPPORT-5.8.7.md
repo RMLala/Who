@@ -1,38 +1,50 @@
-# WorshipFlow 5.8.7 — Cloud automatique AppForge V3
+# WorshipFlow 5.8.7 — Intégration AppForge V3
 
 Date : 18 novembre 2026  
 Branche : `work/worshipflow-v3-cloud-20261117`  
-PR application : https://github.com/RMLala/Who/pull/9  
-PR Worker licence/Cloud : https://github.com/RMLala/appforg/pull/10
+PR WorshipFlow : https://github.com/RMLala/Who/pull/9  
+SDK source : https://github.com/RMLala/appforg/blob/main/cloud/license-worker/client/appforge-cloud-sync.js
 
-## État avant cette modification
+## État précédent
 
-- L’application savait activer et vérifier une licence signée ECDSA.
-- Les données restaient disponibles localement et la synchronisation snapshot gérait les révisions, conflits et copies de récupération.
-- L’accès Cloud utilisait encore un formulaire e-mail/mot de passe puis un choix d’organisation. Ce parcours ne respectait pas la règle V3 sans compte client.
-- Le Worker de synchronisation Cloud n’était pas versionné dans les dépôts consultés.
+- WorshipFlow vérifiait une preuve de licence ECDSA et gardait ses données métier dans IndexedDB.
+- Le client de synchronisation avait un ancien parcours AppForge Cloud et des routes séparées de celles du Worker central.
+- La synchronisation locale/Cloud gérait les snapshots, révisions, conflits et copies de récupération.
+- Le Worker central de licences est déployé par AppForge; le dépôt fournit son SDK officiel.
 
-## Modifications poussées
+## Changements poussés dans la PR
 
-- Retrait du formulaire Cloud, de la sélection d’organisation et de l’ancienne session utilisateur.
-- Après vérification d’une licence payante, l’application demande automatiquement un jeton court au Worker Cloud, lié à la licence et à l’installation. Le renouvellement revalide la licence.
-- L’application transmet la preuve de licence et l’installation au Worker pour chaque lecture/écriture Cloud. Le statut « connecté » n’apparaît qu’avec un jeton valide.
-- Le jeton Cloud reste uniquement en mémoire; il n’est pas écrit dans IndexedDB. À la reprise, il est demandé de nouveau au Worker.
-- L’essai gratuit n’active pas le Cloud. Les changements hors ligne restent sur l’appareil; l’application retente après reconnexion et selon le cycle existant. Les conflits utilisent des révisions compare-and-swap et conservent la copie locale.
-- Ajout d’un Worker Cloudflare + D1 dédié avec limites de taille/quota, isolement par licence/application et vérification serveur des droits/appareils à chaque accès.
-- Le statut du Worker licence distingue maintenant essai et licence payante avec le droit Cloud réel.
-- Version applicative portée à 5.8.7 et versionCode Android à 34.
+- Ajout de la copie exacte du SDK officiel AppForge dans `www/appforge-cloud-sync.js`.
+- Remplacement du Worker Cloud distinct par le Worker central `https://appforge-license-api.appforge-licences-mg.workers.dev`.
+- L’activation passe par le SDK, sans compte Cloud, e-mail, mot de passe ou organisation. Le SDK renouvelle le jeton par `POST /v1/cloud/token` et synchronise les instantanés avec `GET/PUT /v1/cloud/snapshot`.
+- Le SDK est relié aux données de WorshipFlow par des fonctions de lecture/restauration de snapshot. Les médias audio locaux sont exclus.
+- Les données et changements locaux restent disponibles hors ligne; la reprise réseau, le versionnage et la gestion de conflit sont conservés.
+- « Connecté » exige une synchronisation réussie et un jeton non expiré. Aucun jeton n’est affiché.
+- Sans coffre Android activé, les jetons restent en mémoire; seules les métadonnées de révision sont conservées en clair. Avec le verrouillage Android activé, l’état SDK est chiffré par le coffre natif existant.
+- Aucune clé serveur ni `CLOUD_TOKEN_SECRET` n’est inclus dans WorshipFlow.
+- L’ancienne PR Worker séparée #10 a été fermée comme obsolète et ne doit pas être fusionnée ni déployée.
 
-## Vérifications
+## Tests exécutés
 
-- Vérifications syntaxiques des scripts HTML : réussies.
-- Les scans de conformité V3 GitHub ont réussi sur les derniers commits consultés.
-- Tests du Worker : 10 scénarios avec Worker/D1 simulés; ils ne sont pas des tests sur l’instance Cloudflare de production.
-- CI WorshipFlow 5.8.7 : tests Node, navigateur mobile/bureau et builds Debug/Release sont lancés par GitHub Actions; les résultats finaux sont liés à la PR.
-- Aucun APK de téléphone réel ni test de bout en bout MVola/Cloudflare n’a été exécuté ici.
+Workflow WorshipFlow : https://github.com/RMLala/Who/actions/runs/44367395819
 
-## Reste à faire avant d’avoir le Cloud actif en production
+- Tests Node du dépôt : réussite, incluant activation simulée, jeton, upload d’un snapshot, état hors ligne et absence de jeton en clair par défaut.
+- Smoke test navigateur : réussite en viewport 390 px et 1280 px.
+- Build Debug API 23 et API 29 : réussite.
+- Build Release signé et vérification des signatures : en cours au moment de ce rapport.
+- Workflows de conformité AppForge V3 : réussis.
 
-Le PR Worker #10 prépare le code, mais ne déploie pas Cloudflare. Il faut créer la base D1, remplacer l’identifiant d’exemple dans `wrangler.toml`, configurer `CLOUD_TOKEN_SECRET`, appliquer la migration et déployer le Worker. Le Worker licence mis à jour doit aussi être déployé pour fournir les droits `kind/cloud/licenseId`.
+Les appels d’activation et de synchronisation automatisés utilisent des réponses Worker simulées. Ils ne prouvent pas l’activation MVola ni la synchronisation D1 en production.
 
-Jusqu’à ces déploiements, l’écran doit signaler une erreur ou une connexion en attente; il ne doit pas indiquer que le Cloud est connecté. Les tests réels de validation MVola, expiration/révocation, deux appareils, reconnexion réseau, absence de doublons et isolation restent à exécuter contre les Workers et la D1 déployés.
+## Vérification du Worker en production
+
+- `GET /health` retourne `ok:true`.
+- `GET /v1/config` retourne la clé publique attendue et `protocol: appforge-license-v1`.
+- `GET /v1/cloud/snapshot?resource=default` sans authentification retourne `{"error":"Route inconnue."}`. Le Worker publié ne reconnaît donc pas la route GET attendue par le SDK dans cette vérification. La synchronisation de production n’est pas confirmée, même si le Worker et sa configuration répondent.
+
+## Restant à valider
+
+- Corriger ou publier le Worker central pour que ses routes correspondent au SDK officiel, puis refaire la vérification.
+- Activer une licence de test autorisée et valider l’émission/renouvellement du jeton ainsi qu’un snapshot D1.
+- Tester deux appareils autorisés, révocation/expiration, conflits réels, perte et reprise réseau, absence de doublons et isolation entre licences.
+- La vérification MVola réelle nécessite une activation de test; aucun code de licence n’a été fourni pour ce travail.
