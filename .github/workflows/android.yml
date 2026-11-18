@@ -141,7 +141,9 @@ jobs:
           apk-glob: 'android/app/build/outputs/apk/api29/release/*.apk'
           application: 'WorshipFlow'
           folder-id: '13aiSvGllh1nDLkvTVfpb7QOOxgi0YyQ5'
-          service-account-json: ${{ secrets.DRIVE_SERVICE_ACCOUNT_JSON }}
+          oauth-client-id: ${{ secrets.DRIVE_OAUTH_CLIENT_ID }}
+          oauth-client-secret: ${{ secrets.DRIVE_OAUTH_CLIENT_SECRET }}
+          oauth-token-json: ${{ secrets.DRIVE_OAUTH_TOKEN_JSON }}
       - name: Remove temporary keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/android-release.jks"
