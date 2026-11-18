@@ -36,15 +36,28 @@ Workflow WorshipFlow : https://github.com/RMLala/Who/actions/runs/44367395819
 
 Les appels d’activation et de synchronisation automatisés utilisent des réponses Worker simulées. Ils ne prouvent pas l’activation MVola ni la synchronisation D1 en production.
 
-## Vérification du Worker en production
+## Contrat HTTP du Worker central et du SDK
+
+Le code source actuel de `RMLala/appforg/cloud/license-worker/src/index.js` route `GET` et `PUT` sur le chemin exact `/v1/cloud/snapshot`. Le SDK officiel `client/appforge-cloud-sync.js` utilise le même chemin et :
+
+- envoie `GET /v1/cloud/snapshot?resource=default` par défaut ;
+- envoie le jeton de synchronisation dans `Authorization: Bearer <cloudToken>` ;
+- écrit avec `PUT /v1/cloud/snapshot?resource=default` et le JSON `{ "expectedRevision": 0, "snapshot": {} }` ;
+- attend une révision compare-and-swap; le Worker renvoie le snapshot courant avec HTTP 409 en cas de conflit.
+
+Le Worker exige ce jeton avant de lire ou d’écrire D1.
+
+## Vérification de l’instance de production
 
 - `GET /health` retourne `ok:true`.
 - `GET /v1/config` retourne la clé publique attendue et `protocol: appforge-license-v1`.
-- `GET /v1/cloud/snapshot?resource=default` sans authentification retourne `{"error":"Route inconnue."}`. Le Worker publié ne reconnaît donc pas la route GET attendue par le SDK dans cette vérification. La synchronisation de production n’est pas confirmée, même si le Worker et sa configuration répondent.
+- Une requête navigateur `GET /v1/cloud/snapshot?resource=default` sans jeton a retourné `{"error":"Route inconnue."}`. Comme elle ne comportait aucun jeton Bearer, ce résultat ne valide pas le chemin authentifié ni l’accès D1. Il diffère cependant du code source actuel, qui devrait rejeter l’absence de jeton avec HTTP 401. Une requête authentifiée exige une licence de test et n’a pas encore été réalisée.
+
+La PR reste ouverte; aucune synchronisation de production n’est déclarée réussie.
 
 ## Restant à valider
 
-- Corriger ou publier le Worker central pour que ses routes correspondent au SDK officiel, puis refaire la vérification.
+- Avec un jeton Cloud obtenu par une licence de test, appeler le GET authentifié puis écrire/lire un snapshot D1 et vérifier la révision retournée. Comparer le résultat au code source avant toute correction côté application.
 - Activer une licence de test autorisée et valider l’émission/renouvellement du jeton ainsi qu’un snapshot D1.
 - Tester deux appareils autorisés, révocation/expiration, conflits réels, perte et reprise réseau, absence de doublons et isolation entre licences.
 - La vérification MVola réelle nécessite une activation de test; aucun code de licence n’a été fourni pour ce travail.
