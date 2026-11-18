@@ -60,3 +60,9 @@ La PR #9 reste ouverte. La synchronisation n’est pas déclarée opérationnell
 5. fonctionnement hors ligne et reprise à la reconnexion.
 
 Aucun test authentifié de production n’a encore été exécuté; aucun code de licence de test valide n’a été fourni.
+
+## Validation de l’URL Worker mise à jour
+
+Le workflow Android #107 a réussi après le changement de base URL : tests frontend/AppForge, smoke navigateur, builds Debug API 23/29, builds Release signés API 23/29 et signatures vérifiées.
+
+https://github.com/RMLala/Who/actions/runs/44379439549
