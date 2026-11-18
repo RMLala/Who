@@ -61,3 +61,9 @@ La PR reste ouverte; aucune synchronisation de production n’est déclarée ré
 - Activer une licence de test autorisée et valider l’émission/renouvellement du jeton ainsi qu’un snapshot D1.
 - Tester deux appareils autorisés, révocation/expiration, conflits réels, perte et reprise réseau, absence de doublons et isolation entre licences.
 - La vérification MVola réelle nécessite une activation de test; aucun code de licence n’a été fourni pour ce travail.
+
+## Workflow de validation du contrat SDK
+
+Le workflow WorshipFlow #99 a terminé avec succès le 18 novembre 2026 : tests Node et smoke navigateur, build Debug API 23/29, builds Release signés API 23/29 et vérification des signatures. Le test vérifie également la requête SDK : GET avec Bearer, puis PUT sur le chemin snapshot avec `expectedRevision` et `snapshot`. Ce sont toujours des tests simulés et ils ne valident pas la D1 de production.
+
+https://github.com/RMLala/Who/actions/runs/44369757026
