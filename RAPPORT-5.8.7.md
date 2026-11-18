@@ -5,64 +5,58 @@ Branche : `work/worshipflow-v3-cloud-20261117`
 PR WorshipFlow : https://github.com/RMLala/Who/pull/9  
 SDK source : https://github.com/RMLala/appforg/blob/main/cloud/license-worker/client/appforge-cloud-sync.js
 
-## Changements WorshipFlow
+## Configuration WorshipFlow
 
-- SDK officiel AppForge copié dans `www/appforge-cloud-sync.js`.
-- URL configurée : `https://appforge-license-api.appforge-licences-mg.workers.dev`.
-- Activation sans compte Cloud, e-mail, mot de passe ni organisation.
-- Jeton renouvelé par `POST /v1/cloud/token); snapshots par `GET/PUT /v1/cloud/snapshot`.
-- Données locales conservées hors ligne; aucune clé serveur ni `CLOUD_TOKEN_SECRET` dans l’application.
-- « Connecté » exige une synchronisation réussie avec jeton valide. Aucune route/méthode SDK n’a été modifiée.
+- URL de base licence et Cloud : `https://appforge-license-api.lalainaadclick.workers.dev`.
+- Parcours licence sans compte Cloud, e-mail, mot de passe ni organisation.
+- Renouvellement du jeton par `POST /v1/cloud/token`.
+- Synchronisation avec `GET/PUT /v1/cloud/snapshot); aucune méthode ni route SDK n’a été changée.
+- Aucune modification des secrets ou de la configuration D1.
+- Aucune clé serveur ni `CLOUD_TOKEN_SECRET` dans l’application.
+- « Connecté » reste conditionné à une synchronisation réussie avec un jeton valide.
 
 ## Contrat HTTP officiel
 
-La source officielle `RMLala/appforg/cloud/license-worker/src/index.js` (SHA `76f2be77705073874570748ec3b2a326cf3db7ff`) route explicitement `GET` et `PUT` sur `/v1/cloud/snapshot`. Le SDK officiel (SHA `9a06175c9ca610f8c99474fa165abc311de414c5`) :
+La source `RMLala/appforg/cloud/license-worker/src/index.js` (SHA `76f2be77705073874570748ec3b2a326cf3db7ff`) route `GET` et `PUT` sur `/v1/cloud/snapshot`. Le SDK officiel (SHA `9a06175c9ca610f8c99474fa165abc311de414c5`) :
 
 - lit `GET /v1/cloud/snapshot?resource=default` avec `Authorization: Bearer <cloudToken>` ;
 - écrit par `PUT` au même chemin avec `{ "expectedRevision": n, "snapshot": {...} }` ;
 - utilise compare-and-swap; la source renvoie HTTP 409 et l’instantané courant en cas de conflit.
 
-WorshipFlow conserve exactement ce contrat.
+## Déploiement central et contrôles HTTP
 
-## Déploiement et Cloudflare
+Le workflow [AppForge Worker #4](https://github.com/RMLala/appforg/actions/runs/44358161206) a déployé `appforge-license-api` sur `https://appforge-license-api.lalainaadclick.workers.dev`. Le journal signale 7 migrations appliquées à la base Wrangler `appforge-licenses`, ID `a77521ea-dc78-4b80-b495-405127e275e7`. Aucune modification de D1 n’a été faite par cette PR.
 
-Le workflow [Deploy AppForge license and cloud Worker #4](https://github.com/RMLala/appforg/actions/runs/44358161206) a réussi. Wrangler a déployé `appforge-license-api` sur `https://appforge-license-api.lalainaadclick.workers.dev` et appliqué 7 migrations à `appforge-licenses`, D1 ID `a77521ea-dc78-4b80-b495-405127e275e7`.
+Contrôles HTTP du 18 novembre 2026 :
 
-La capture Cloudflare et le tableau de bord connecté confirment que le compte `Lalainaadclick` a le sous-domaine `lalainaadclick.workers.dev`, ce Worker et cette base D1. L’ID correspond à `cloud/license-worker/wrangler.toml`. L’utilisateur confirme que ses secrets et la base sont déjà correctement configurés; aucune demande de les ressaisir n’est nécessaire.
+- Sur `https://appforge-license-api.lalainaadclick.workers.dev`, `GET /health` répond 200.
+- GET snapshot sans jeton répond HTTP 401 (`Jeton Cloud invalide ou expiré.`).
+- Le préflight OPTIONS pour PUT répond 204 et autorise `GET, POST, PUT, PATCH, DELETE, OPTIONS`.
+- L’ancienne URL `https://appforge-license-api.appforge-licences-mg.workers.dev` répondait 404 pour le snapshot et son préflight ne listait pas PUT; elle n’est plus utilisée par WorshipFlow après cette correction.
 
-Le workflow #4 a vérifié l’ancienne URL `appforge-license-api.appforge-licences-mg.workers.dev` pour seulement `/health` et `/v1/config`, sans vérifier le snapshot ou confirmer le domaine annoncé par Wrangler.
+Ces résultats confirment que la route est reconnue sur le Worker central cible. Ils ne prouvent pas l’accès authentifié ni l’écriture/lecture D1.
 
-## Vérifications HTTP
+## Tests
 
-Au 18 novembre 2026 :
-
-**Déploiement du compte `Lalainaadclick`**
-- `GET /health` : HTTP 200.
-- GET snapshot sans jeton : HTTP 401, `Jeton Cloud invalide ou expiré.`.
-- Préflight PUT : HTTP 204, CORS autorise `GET, POST, PUT, PATCH, DELETE, OPTIONS`.
-
-**URL configurée dans WorshipFlow (`appforge-licences-mg`)**
-- `GET /health` et `GET /v1/config` : HTTP 200.
-- GET snapshot sans jeton : HTTP 404, `Route inconnue.`.
-- Préflight PUT : HTTP 204, CORS annonce `GET, POST, OPTIONS`, sans PUT.
-
-La source est donc bien déployée dans le compte visible, mais le sous-domaine Workers.dev de ce compte ne correspond pas à l’URL utilisée par WorshipFlow. Le tableau de bord Cloudflare précise que changer ce sous-domaine déplace **tous les Workers existants et nouveaux** du compte. Un seul Worker apparaît dans le compte consulté. Ce réglage n’a pas été modifié; il faut éviter de le changer sans confirmer la disponibilité/propriété de `appforge-licences-mg) et son effet sur les autres URLs.
-
-## Tests et état
-
-Workflow WorshipFlow #99 : https://github.com/RMLala/Who/actions/runs/44369757026
+Workflow WorshipFlow #99, avant ce changement d’URL : https://github.com/RMLala/Who/actions/runs/44369757026
 
 - Tests Node et contrat SDK simulé : réussite.
-- Smoke navigateur 390 px et 1280 px : réussite.
+- Smoke test navigateur 390 px et 1280 px : réussite.
 - Builds Debug API 23/29 : réussite.
-- Builds Release signés API 23/29 et signatures : réussite.
+- Builds Release signés API 23/29 et vérification des signatures : réussite.
 
-La PR #9 reste ouverte. Aucune activation, obtention de jeton ni lecture/écriture D1 authentifiée en production n’a été validée; la synchro n’est pas déclarée opérationnelle. Aucun code de licence de test valide n’a été fourni.
+Le nouveau commit relance la CI avec la nouvelle URL et les assertions de configuration mises à jour.
 
-Avant la validation finale, il faut aligner le domaine du Worker avec `appforge-license-api.appforge-licences-mg.workers.dev` sans modifier le contrat SDK, puis tester avec une licence valide l’activation, le jeton, GET authentifié, PUT et relecture D1, et reprise hors ligne.
+## État et validations restantes
 
-## Liens
+La PR #9 reste ouverte. La synchronisation n’est pas déclarée opérationnelle.
 
-- PR WorshipFlow #9 : https://github.com/RMLala/Who/pull/9
-- Déploiement Worker #4 : https://github.com/RMLala/appforg/actions/runs/44358161206
-- Tests et APK WorshipFlow #99 : https://github.com/RMLala/Who/actions/runs/44369757026
+À vérifier avec une licence de test valide :
+
+1. activation de la licence ;
+2. obtention du jeton Cloud ;
+3. lecture authentifiée d’un instantané ;
+4. écriture authentifiée puis relecture et vérification de la révision dans D1 ;
+5. fonctionnement hors ligne et reprise à la reconnexion.
+
+Aucun test authentifié de production n’a encore été exécuté; aucun code de licence de test valide n’a été fourni.

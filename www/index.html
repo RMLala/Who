@@ -742,7 +742,7 @@ const oldStats=vSta;vSta=function(){const base=oldStats(),lim=new Date(Date.now(
 
 document.addEventListener('fullscreenchange',()=>{if(!NativeAudioAPI){immersive=!!document.fullscreenElement;$('#stage').classList.toggle('immersive',immersive)}});
 /* AppForge integration: no admin secret, password or audio is included in snapshots. */
-const AF_CONFIG=Object.freeze({license:'https://appforge-license-api.appforge-licences-mg.workers.dev',cloud:'https://appforge-license-api.appforge-licences-mg.workers.dev',product:'WORSHIPFLOW',app:'worshipflow',key:{kty:'EC',crv:'P-256',x:'PZdjR-o7j1_IHcy5lOSwJgZ4_QSOlfYANDtznJtv4Nw',y:'2edphnUcQ7PJra_gjTKskTLNNueAeNCc7p73xkBDu1Y',ext:true,key_ops:['verify']}});
+const AF_CONFIG=Object.freeze({license:'https://appforge-license-api.lalainaadclick.workers.dev',cloud:'https://appforge-license-api.lalainaadclick.workers.dev',product:'WORSHIPFLOW',app:'worshipflow',key:{kty:'EC',crv:'P-256',x:'PZdjR-o7j1_IHcy5lOSwJgZ4_QSOlfYANDtznJtv4Nw',y:'2edphnUcQ7PJra_gjTKskTLNNueAeNCc7p73xkBDu1Y',ext:true,key_ops:['verify']}});
 const afUn64=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
 async function afHash(text){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(n=>n.toString(16).padStart(2,'0')).join('')}
 async function afVerify(token,installation,now=Date.now()){
