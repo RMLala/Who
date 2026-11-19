@@ -36,7 +36,7 @@ Contrôles source :
 
 - `npm test` exécuté localement après la correction : 18 réussites, 0 échec. Les scénarios activation/statut/jeton/snapshot, essai valide/expiré et activation payée avec conflit sont simulés; ils ne constituent pas une preuve D1 de production.
 - Le smoke navigateur local n’a pas démarré : l’exécutable Chromium de Playwright n’est pas installé dans cet environnement. Le workflow Android PR vérifie le navigateur et les quatre variantes APK; le prochain run doit confirmer cette révision.
-- Le workflow Android #130 a d’abord échoué sur les miroirs Ubuntu (HTTP 503); sa relance a révélé un droit Cloud manquant dans le fixture UI du test navigateur. Le fixture est corrigé; un nouveau run PR est nécessaire pour confirmer le smoke et les builds.
+- Le workflow Android #130 a d’abord échoué sur les miroirs Ubuntu (HTTP 503); sa relance a révélé un droit Cloud manquant dans le fixture UI, depuis corrigé. Le run #131 a de nouveau échoué sur les miroirs Ubuntu pendant l’installation de dépendances facultatives Chromium, avant le smoke test. Le workflow installe maintenant Chromium sans cette étape `apt`; une nouvelle CI doit confirmer le smoke et les builds.
 - Workflow Android #127 réussi : tests frontend/AppForge, smoke navigateur 390/1280 px, builds Debug API 23/29 et Release signés API 23/29; vérification des signatures réussie : https://github.com/RMLala/Who/actions/runs/44501804887
 - Scans AppForge #112 et central compliance #105 : réussis.
 - Artefacts téléchargeables (ZIP contenant APK) :

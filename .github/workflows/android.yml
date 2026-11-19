@@ -38,7 +38,7 @@ jobs:
       - name: Run frontend and AppForge tests
         run: npm test
       - name: Install browser for UI checks
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Check mobile and desktop UI
         run: node tests/browser.cjs
       - name: Sync Capacitor Android project
