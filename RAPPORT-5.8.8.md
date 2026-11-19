@@ -10,6 +10,8 @@ PR #9 (laissée ouverte) : https://github.com/RMLala/Who/pull/9
 - Clé publique de vérification alignée sur la réponse actuelle de `GET /v1/config`. La configuration publique observée le 19 novembre renvoie le protocole `appforge-license-v1`.
 - À l’initialisation, les anciennes préférences de connexion Cloud (URL Worker, organisation et e-mail) sont retirées du seul enregistrement AppForge Cloud et sauvegardées ainsi nettoyées. Les tables de données métier ne sont pas touchées.
 - SDK client remplacé par la version officielle actuelle du dépôt AppForge, SHA `b3518f016f859645ce987c088dd1b75a6777305f`. Le contrat reste celui du Worker : activation, statut, renouvellement du jeton et GET/PUT de l’instantané avec Bearer.
+- Correction de l’éligibilité Cloud : un essai signé non expiré peut obtenir et renouveler son jeton Cloud pendant sa période serveur de 72 heures. À l’expiration, l’accès Cloud est bloqué et les données métier locales sont conservées.
+- Après activation d’une licence payée, le jeton retourné par le Worker est repris automatiquement et la synchronisation redémarre; les conflits existants restent soumis au choix de l’utilisateur.
 - La révocation efface l’état de session/licence Cloud local et conserve les données métier hors ligne.
 - Version applicative portée à 5.8.8; versionCode Android par défaut 34.
 
@@ -32,7 +34,8 @@ Contrôles source :
 
 ## CI et fichiers téléchargeables
 
-- `npm test` exécuté localement : 15 réussites, 0 échec. Les scénarios d’activation/statut/jeton/snapshot sont simulés; les tests couvrent aussi la migration préférences/coffre, la révocation, le hors ligne et la reprise réseau. Ce n’est pas une preuve D1 de production.
+- `npm test` exécuté localement après la correction : 18 réussites, 0 échec. Les scénarios activation/statut/jeton/snapshot, essai valide/expiré et activation payée avec conflit sont simulés; ils ne constituent pas une preuve D1 de production.
+- Le smoke navigateur local n’a pas démarré : l’exécutable Chromium de Playwright n’est pas installé dans cet environnement. Le workflow Android PR vérifie le navigateur et les quatre variantes APK; le prochain run doit confirmer cette révision.
 - Workflow Android #127 réussi : tests frontend/AppForge, smoke navigateur 390/1280 px, builds Debug API 23/29 et Release signés API 23/29; vérification des signatures réussie : https://github.com/RMLala/Who/actions/runs/44501804887
 - Scans AppForge #112 et central compliance #105 : réussis.
 - Artefacts téléchargeables (ZIP contenant APK) :
