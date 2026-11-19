@@ -33,7 +33,8 @@ Contrôles source :
 ## CI
 
 - `npm test` exécuté localement : 15 tests réussis, 0 échec (activation/statut/jeton/snapshot simulés, migration des préférences et du coffre, révocation, hors ligne et reprise réseau simulés). Ce n’est pas une preuve D1 de production.
-- Le run Android #120 a échoué au smoke navigateur : le motif de routage du mock ne capturait pas la route trial après le changement d’URL. Le mock a été corrigé pour intercepter `/v1/trial`; le workflow Android #122 et les deux contrôles AppForge du commit courant sont en cours.
+- Les runs Android #120 à #126 ont échoué au smoke navigateur : le mock ne simulait pas le nouveau contrôle `POST /v1/status` ajouté dans le SDK officiel. Le mock est maintenant complété pour ce statut; le run Android #127 vérifie la correction.
+- Scans AppForge #111 et #104 : réussis. APK Debug/Release de la version 5.8.8 : pas encore produits, car le smoke test du dernier run est en cours.
 - Les assertions de tests simulés ne sont pas considérées comme une preuve de synchronisation de production.
 
 ## À faire avant de déclarer la synchronisation opérationnelle
