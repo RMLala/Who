@@ -30,13 +30,17 @@ Contrôles source :
 - `GET /v1/config` n’expose pas les produits D1. L’identifiant enregistré dans D1 n’a donc pas été vérifié directement; il reste à confirmer auprès d’une licence de test valide.
 - Aucun secret administrateur, clé privée ou `CLOUD_TOKEN_SECRET` ajouté à l’application.
 
-## CI
+## CI et fichiers téléchargeables
 
-- `npm test` exécuté localement : 15 tests réussis, 0 échec (activation/statut/jeton/snapshot simulés, migration des préférences et du coffre, révocation, hors ligne et reprise réseau simulés). Ce n’est pas une preuve D1 de production.
-- Les runs Android #120 à #126 ont échoué au smoke navigateur : le mock ne simulait pas le nouveau contrôle `POST /v1/status` ajouté dans le SDK officiel. Le mock est maintenant complété pour ce statut; le run Android #127 vérifie la correction.
-- Scans AppForge #111 et #104 : réussis. APK Debug/Release de la version 5.8.8 : pas encore produits, car le smoke test du dernier run est en cours.
-- Les assertions de tests simulés ne sont pas considérées comme une preuve de synchronisation de production.
+- `npm test` exécuté localement : 15 réussites, 0 échec. Les scénarios d’activation/statut/jeton/snapshot sont simulés; les tests couvrent aussi la migration préférences/coffre, la révocation, le hors ligne et la reprise réseau. Ce n’est pas une preuve D1 de production.
+- Workflow Android #127 réussi : tests frontend/AppForge, smoke navigateur 390/1280 px, builds Debug API 23/29 et Release signés API 23/29; vérification des signatures réussie : https://github.com/RMLala/Who/actions/runs/44501804887
+- Scans AppForge #112 et central compliance #105 : réussis.
+- Artefacts téléchargeables (ZIP contenant APK) :
+  - Debug API 23 + API 29 : https://api.github.com/repos/RMLala/Who/actions/artifacts/14517268141/zip
+  - Release signé API 23 : https://api.github.com/repos/RMLala/Who/actions/artifacts/14518206532/zip
+  - Release signé API 29 : https://api.github.com/repos/RMLala/Who/actions/artifacts/14517024936/zip
 
+Ces artefacts valident la compilation et la signature, pas la synchronisation D1 en production.
 ## À faire avant de déclarer la synchronisation opérationnelle
 
 Avec une licence de test valide et le bon produit D1 :
