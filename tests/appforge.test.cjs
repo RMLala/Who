@@ -8,12 +8,12 @@ test('canonical snapshot digest independent of object property order',async()=>{
 test('forged and tampered license rejected',async()=>{const e=env();await assert.rejects(e.run("afVerify('invalid','installation')"));await assert.rejects(e.run("afVerify(btoa(JSON.stringify({v:1,app:'WORSHIPFLOW'}))+'.AA','installation')"))});
 test('network errors preserve cached license; authoritative revocation denies access',async()=>{const e=env({fetch:async()=>{throw Error('offline')}});e.run("AF.installation='test-installation';AF.license={token:'cached',active:true};afGate=()=>{};afPersist=async()=>{};");await e.run("afLicense('status')");assert.equal(e.run('AF.license.active'),true);e.ctx.fetch=async()=>({ok:false,status:403,json:async()=>({error:'revoked'})});await e.run("afLicense('status')");assert.equal(e.run('AF.license.active'),false)});
 test('legacy Cloud URL/account preferences are removed while the default Worker remains pinned',async()=>{
- const e=env();e.db.set('kv:appforge-cloud',{apiBase:'https://old-license.workers.dev',workerUrl:'https://old-cloud.workers.dev',org:'legacy-org',accountEmail:'legacy@example.test',lastSync:123});
+ const e=env();e.db.set('kv:appforge-cloud',{apiBase:'https://old-license.workers.dev',workerUrl:'https://old-cloud.workers.dev',org:'legacy-org',accountEmail:'legacy@example.test',lastSync:123});e.db.set('kv:appforge-cloud-entitlement',{apiBase:'https://old-license.workers.dev',workerUrl:'https://old-cloud.workers.dev',licenseToken:'license-token',cloudToken:'cloud-token'});e.db.set('songs:42',{id:42,title:'Local'});
  e.run('afGate=()=>{}');await e.run('afInit()');e.run('clearInterval(AF.timer);AF.timer=null');
  assert.equal(e.run("AF_CONFIG.license"),'https://appforge-license-api.lalainaadclick.workers.dev');
  assert.equal(e.run("AF_CONFIG.cloud"),'https://appforge-license-api.lalainaadclick.workers.dev');
- const saved=e.db.get('kv:appforge-cloud');for(const key of ['apiBase','workerUrl','org','accountEmail'])assert.ok(!(key in saved));
- assert.equal(saved.lastSync,123);
+ const saved=e.db.get('kv:appforge-cloud');assert.equal(saved.apiBase,'https://appforge-license-api.lalainaadclick.workers.dev');for(const key of ['workerUrl','org','accountEmail'])assert.ok(!(key in saved));
+ assert.equal(saved.lastSync,123);const entitlement=e.db.get('kv:appforge-cloud-entitlement');for(const key of ['apiBase','workerUrl'])assert.ok(!(key in entitlement));assert.equal(entitlement.licenseToken,'license-token');assert.equal(entitlement.cloudToken,'cloud-token');assert.equal(e.db.get('songs:42').title,'Local');
 });
 test('SDK activates a license and synchronizes its first snapshot without account fields',async()=>{
  const calls=[],stored=new Map(),events=[],now=new Date(Date.now()+3600000).toISOString();
