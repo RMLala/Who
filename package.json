@@ -1,6 +1,6 @@
 {
   "name": "worshipflow",
-  "version": "5.8.5",
+  "version": "5.8.8",
   "private": true,
   "description": "WorshipFlow : application de préparation et de direction de la louange",
   "scripts": {
