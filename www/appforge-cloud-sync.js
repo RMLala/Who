@@ -56,12 +56,16 @@
       this.entitlementKey = options.entitlementKey || 'appforge-cloud-entitlement-v1:' + productId;
       this.hooks = options.data || null;
       this.onStatus = options.onStatus || (() => {});
+      this.onLicenseRevoked = options.onLicenseRevoked || (() => {});
+      this._lastStatusVerifiedAt = 0;
+      this._statusCheckMaxAgeMs = Math.max(30000, Number(options.statusCheckMaxAgeMs) || 300000);
       this.onInitialRemote = options.onInitialRemote || null;
       this.onConflict = options.onConflict || null;
       this.debounceMs = Math.max(250, Number(options.debounceMs) || 1200);
       this.pending = null;
       this.started = false;
-      this._online = () => { if (this.started) this.sync().catch(error => this._status({ state: 'error', error: error.message })); };
+      this._online = () => { if (this.started) { this._lastStatusVerifiedAt = 0; this.sync({ forceLicenseCheck: true }).catch(error => this._status({ state: 'error', error: error.message })); } };
+      this._visibility = () => { if (this.started && globalThis.document?.visibilityState === 'visible') { this._lastStatusVerifiedAt = 0; this.sync({ forceLicenseCheck: true }).catch(error => this._status({ state: 'error', error: error.message })); } };
     }
 
     _status(value) { try { this.onStatus(value); } catch (error) { console.warn('AppForge Cloud status handler:', error); } }
@@ -126,7 +130,60 @@
       if (this.hooks) sync = await this.sync();
       return { ...data, sync };
     }
+    async _rejectLicense(record, error) {
+      record.licenseToken = '';
+      record.cloudToken = '';
+      record.cloudExpiresAt = null;
+      record.revokedAt = new Date().toISOString();
+      await this._save(record);
+      this._lastStatusVerifiedAt = 0;
+      const detail = { state: 'revoked', active: false, error: error.message, preserveLocalData: true };
+      this._status(detail);
+      try { this.onLicenseRevoked(detail); } catch (callbackError) { console.warn('AppForge revocation handler:', callbackError); }
+      return detail;
+    }
+    async checkLicenseStatus(options = {}) {
+      if (!this.isOnline()) {
+        const detail = { state: 'offline', verified: false, preserveLocalData: true };
+        this._status(detail);
+        return detail;
+      }
+      const record = await this._record();
+      if (!record.licenseToken) {
+        const detail = { state: 'unlicensed', active: false };
+        this._status(detail);
+        return detail;
+      }
+      if (!options.force && this._lastStatusVerifiedAt && Date.now() - this._lastStatusVerifiedAt < this._statusCheckMaxAgeMs) {
+        return { state: 'licensed', active: true, cached: true };
+      }
+      try {
+        const result = await this._request('/v1/status', {
+          method: 'POST',
+          body: JSON.stringify({ productId: this.productId, token: record.licenseToken, installationId: await this._installationId() })
+        });
+        if (!result.active) {
+          const error = new Error(result.error || 'Cette licence a été révoquée, désactivée ou expirée.');
+          error.status = 403;
+          error.data = result;
+          return this._rejectLicense(record, error);
+        }
+        this._lastStatusVerifiedAt = Date.now();
+        record.statusCheckedAt = new Date().toISOString();
+        await this._save(record);
+        const detail = { state: 'licensed', active: true, checkedAt: record.statusCheckedAt, expiresAt: result.expiresAt || null };
+        this._status(detail);
+        return detail;
+      } catch (error) {
+        if ([401, 403].includes(error.status) || error.data?.revoked || error.data?.expired || error.data?.invalid) return this._rejectLicense(record, error);
+        const detail = { state: 'verification-pending', active: null, error: error.message, preserveLocalData: true };
+        this._status(detail);
+        return detail;
+      }
+    }
     async _cloudToken(force = false) {
+      const verification = await this.checkLicenseStatus();
+      if (verification.state !== 'licensed') throw new Error(verification.error || (verification.state === 'revoked' ? 'Cette licence a été révoquée.' : 'La licence doit être vérifiée en ligne avant la synchronisation.'));
       let record = await this._record();
       if (!record.licenseToken) throw new Error('Active d’abord une licence AppForge ou un essai.');
       const expires = Date.parse(record.cloudExpiresAt || '');
@@ -155,6 +212,9 @@
       if (!hooks?.getSnapshot || !hooks?.applySnapshot) throw new Error('Déclare data.getSnapshot et data.applySnapshot pour relier les données de cette application.');
       const resource = this._resource(options.resource || 'default');
       if (!this.isOnline()) return { state: 'offline' };
+      const license = await this.checkLicenseStatus({ force: options.forceLicenseCheck === true });
+      if (license.state === 'revoked' || license.state === 'unlicensed') return { ...license, resource };
+      if (license.state === 'verification-pending') return { ...license, resource, localOnly: true };
       this._status({ state: 'syncing', resource });
       let token = await this._cloudToken();
       let remote;
@@ -277,8 +337,8 @@
     }
     start() {
       if (!this.hooks?.getSnapshot || !this.hooks?.applySnapshot) throw new Error('Configure les adaptateurs de données avant start().');
-      if (!this.started) { this.started = true; globalThis.addEventListener?.('online', this._online); }
-      return this.sync();
+      if (!this.started) { this.started = true; globalThis.addEventListener?.('online', this._online); globalThis.document?.addEventListener?.('visibilitychange', this._visibility); }
+      return this.sync({ forceLicenseCheck: true });
     }
     notifyLocalChange(resource = 'default') {
       if (!this.started || !this.isOnline()) return;
@@ -289,6 +349,7 @@
       this.started = false;
       clearTimeout(this.pending);
       globalThis.removeEventListener?.('online', this._online);
+      globalThis.document?.removeEventListener?.('visibilitychange', this._visibility);
     }
   }
 
