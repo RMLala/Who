@@ -829,8 +829,9 @@ function afCloudClient(){
    else if(state.state==='error'){AF.cloud.status='error';AF.cloud.error=state.error||afText('Synchronisation indisponible.','Tsy mandeha ny fampifanarahana.','Sync unavailable.')}
    else if(state.state==='syncing'){AF.cloud.status=valid?'syncing':'pending'}
    else if(state.state==='licensed'||state.state==='trial'){AF.cloud.status=valid?'pending':'disconnected'}
+   else if(state.state==='revoked'||state.state==='unlicensed'){AF.cloud.status='disconnected';AF.cloud.token='';AF.cloud.tokenExpiresAt=null;AF.license.active=false;if(state.state==='revoked')AF.license.token='';AF.cloud.error=state.error||afText('Licence révoquée ou inactive.','Tsy manan-kery intsony ny lisansa.','License revoked or inactive.')}
    afPersist().catch(()=>{});if(tab==='reg')render()
-  }});
+  },onLicenseRevoked:detail=>{AF.license.active=false;AF.license.token='';AF.cloud.status='disconnected';AF.cloud.token='';AF.cloud.tokenExpiresAt=null;AF.cloud.error=detail?.error||afText('Licence révoquée. Les données locales sont conservées.','Nofoanana ny lisansa. Voatahiry eto an-toerana ny angona.','License revoked. Local data is preserved.');afPersist().catch(()=>{})}});
  }
  return AF.sdk
 }
