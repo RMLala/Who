@@ -32,7 +32,8 @@ Contrôles source :
 
 ## CI
 
-- Tests unitaires/mockés, tests navigateur, APK Debug API 23/29 et APK Release signés API 23/29 : en cours pour la dernière révision; résultat à confirmer avant clôture de cette mise à jour.
+- `npm test` exécuté localement : 15 tests réussis, 0 échec (activation/statut/jeton/snapshot simulés, migration des préférences et du coffre, révocation, hors ligne et reprise réseau simulés). Ce n’est pas une preuve D1 de production.
+- Le run Android #120 a échoué au smoke navigateur : le motif de routage du mock ne capturait pas la route trial après le changement d’URL. Le mock a été corrigé pour intercepter `/v1/trial`; le workflow Android #122 et les deux contrôles AppForge du commit courant sont en cours.
 - Les assertions de tests simulés ne sont pas considérées comme une preuve de synchronisation de production.
 
 ## À faire avant de déclarer la synchronisation opérationnelle
