@@ -185,7 +185,7 @@ const FNm=['Lora','Palatino','Times','Noto Serif','Inter','Trebuchet','Verdana',
 Object.assign(D.fr,{bib:'Bibliothèque',tb:'Avant',td:'Pendant',ta:'Après',au2:'Sauvegarde automatique hebdomadaire (APK)',inst:'Installer l’application'});
 Object.assign(D.mg,{bib:'Rakitsary',tb:'Alohan’ny hira',td:'Mandritra',ta:'Aorian’ny hira',au2:'Tahiry mandeha ho azy isan-kerinandro (APK)',inst:'Hametraka ny application'});
 Object.assign(D.en,{bib:'Library',tb:'Before',td:'During',ta:'After',au2:'Weekly automatic backup (APK)',inst:'Install the app'});
-const VER='5.8.6',CHG={fr:'5.8.6 : verrouillage PIN facultatif et réglage biométrique séparé.',mg:'5.8.6 : fanidiana PIN tsy an-tery sy safidy biometrika misaraka.',en:'5.8.6: optional PIN lock and separate biometric control.'};
+const VER='5.8.8',CHG={fr:'5.8.6 : verrouillage PIN facultatif et réglage biométrique séparé.',mg:'5.8.6 : fanidiana PIN tsy an-tery sy safidy biometrika misaraka.',en:'5.8.6: optional PIN lock and separate biometric control.'};
 let dfp=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dfp=e;const b=document.querySelector('#pwab');if(b)b.hidden=false});
 const pwaInstall=()=>{if(dfp){dfp.prompt();dfp=null}};
 if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)&&!window.Capacitor)navigator.serviceWorker.register('sw.js').catch(()=>{});

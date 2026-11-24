@@ -61,7 +61,7 @@ jobs:
 
   release:
     name: Signed Release APKs (API 23 and 29)
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: debug
     runs-on: ubuntu-latest
     steps:
